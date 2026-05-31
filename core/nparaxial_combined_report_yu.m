@@ -44,6 +44,7 @@ function lines = nparaxial_combined_report_yu( ...
         lines = append_section_local(lines, "Aperture stop / pupil", ...
             "Unavailable: " + diagnostics.stop_error);
     else
+        lines = append_selected_stop_local(lines, diagnostics);
         lines = append_table_local(lines, "Aperture stop candidates", ...
             diagnostics.stop.candidate_table);
         if ~isempty(diagnostics.pupil)
@@ -96,19 +97,65 @@ function lines = nparaxial_combined_report_yu( ...
 end
 
 
+function lines = append_selected_stop_local(lines, diagnostics)
+    lines = add_line_local(lines, "Selected axial stop");
+    lines = add_line_local(lines, "-------------------");
+    lines = add_line_local(lines, ...
+        "stop_selection_rule = Aperture stop is selected from the axial field y_obj = 0 using the tightest launch-slope interval.");
+
+    stopDiag = diagnostics.stop;
+    if ~stopDiag.has_stop
+        lines = add_line_local(lines, "selected_axial_stop = none");
+        lines = add_line_local(lines, "");
+        return
+    end
+
+    stopType = "";
+    if isfield(stopDiag, 'selected_event') && ~isempty(stopDiag.selected_event)
+        stopType = string(stopDiag.selected_event.type(1));
+    end
+
+    lines = add_line_local(lines, ...
+        "selected_axial_stop_element_id = " + string(stopDiag.selected_element_id));
+    lines = add_line_local(lines, ...
+        "selected_axial_stop_type = " + stopType);
+    lines = add_line_local(lines, sprintf( ...
+        "selected_axial_stop_event_index = %.12g", ...
+        stopDiag.selected_event_index));
+    lines = add_line_local(lines, sprintf( ...
+        "selected_axial_stop_z = %.12g", stopDiag.selected_z));
+    lines = add_line_local(lines, sprintf( ...
+        "selected_axial_stop_aperture_radius = %.12g", ...
+        stopDiag.selected_aperture_radius));
+    lines = add_line_local(lines, "selected_axial_stop_note = " + ...
+        string(stopDiag.note));
+
+    if isfield(diagnostics, 'off_axis_warning') && ...
+            strlength(diagnostics.off_axis_warning) > 0
+        lines = add_line_local(lines, ...
+            "off_axis_stop_note = Off-axis diagnostics trace rays for the selected field height, but aperture stop selection remains axial. Full off-axis vignetting interval analysis is not implemented in this milestone.");
+    end
+    lines = add_line_local(lines, "");
+end
+
+
 function lines = append_table_local(lines, titleText, T)
     lines = add_line_local(lines, titleText);
     lines = add_line_local(lines, repmat('-', 1, strlength(titleText)));
-    if ~istable(T) || isempty(T)
+    if ~istable(T)
+        lines = add_line_local(lines, "(unavailable)");
+        lines = add_line_local(lines, "");
+        return
+    end
+
+    tableLines = nparaxial_table_to_text_yu(T);
+    if isempty(tableLines)
         lines = add_line_local(lines, "(empty or unavailable)");
         lines = add_line_local(lines, "");
         return
     end
 
-    text = string(evalc('disp(T)'));
-    rows = splitlines(text);
-    rows = rows(strlength(rows) > 0);
-    lines = [lines; rows(:); ""]; %#ok<AGROW>
+    lines = [lines; tableLines(:); ""]; %#ok<AGROW>
 end
 
 

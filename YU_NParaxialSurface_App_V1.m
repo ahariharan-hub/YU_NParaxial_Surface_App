@@ -50,6 +50,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         Data struct
         IsRunning logical = false
+        IsDirty logical = true
         SelectedPrescriptionRows double = []
     end
 
@@ -177,7 +178,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'Two thin lenses', ...
                 'Two-surface thick lens', ...
                 'Stop clipping demo'}, ...
-                'Value', 'Two thin lenses');
+                'Value', 'Two thin lenses', ...
+                'ValueChangedFcn', @(~, ~) app.requestTrace());
             app.PresetDropdown.Layout.Row = 9;
             app.PresetDropdown.Layout.Column = 2;
 
@@ -498,24 +500,12 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.PrescriptionTable.Data = nparaxial_default_prescription_yu();
             app.SelectedPrescriptionRows = [];
             app.Data = struct();
+            app.IsDirty = true;
         end
 
         function resetDefaults(app)
             app.loadDefaults();
-            app.setStatus("Defaults loaded. Press Run Trace.", false);
-            cla(app.RayAxes);
-            app.SummaryTextArea.Value = {};
-            app.MatrixTable.Data = table();
-            app.CardinalTextArea.Value = {};
-            app.CardinalTable.Data = table();
-            app.PupilTextArea.Value = {};
-            app.PupilCandidateTable.Data = table();
-            app.ChiefTextArea.Value = {};
-            app.ChiefRayTable.Data = table();
-            app.ChiefEventTable.Data = table();
-            app.InvariantTextArea.Value = {};
-            app.InvariantSummaryTable.Data = table();
-            app.PhaseSpaceTable.Data = table();
+            app.markDirty("Defaults loaded.");
         end
 
         function loadSelectedPreset(app)
@@ -524,10 +514,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     app.PresetDropdown.Value);
                 app.PrescriptionTable.Data = table_to_prescription_yu(prescription);
                 app.SelectedPrescriptionRows = [];
-                app.Data = struct();
-                app.requestTrace();
-                app.setStatus("Loaded default prescription: " + ...
-                    string(app.PresetDropdown.Value) + ".", false);
+                app.markDirty("Loaded default prescription: " + ...
+                    string(app.PresetDropdown.Value) + ".");
             catch ME
                 app.setStatus("Error: " + string(ME.message), true);
             end
@@ -538,8 +526,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 prescription = table_to_prescription_yu(app.PrescriptionTable.Data);
                 app.PrescriptionTable.Data = prescription;
                 enabledCount = sum(prescription.enabled);
-                app.setStatus(sprintf( ...
-                    'Prescription OK: %d enabled element(s).', enabledCount), false);
+                app.markDirty(sprintf( ...
+                    'Prescription OK: %d enabled element(s).', enabledCount));
             catch ME
                 app.setStatus("Prescription error: " + string(ME.message), true);
             end
@@ -576,9 +564,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 filename = fullfile(pathName, fileName);
                 app.PrescriptionTable.Data = load_prescription_csv_yu(filename);
                 app.SelectedPrescriptionRows = [];
-                app.Data = struct();
-                app.requestTrace();
-                app.setStatus("Loaded prescription CSV: " + string(filename), false);
+                app.markDirty("Loaded prescription CSV: " + string(filename) + ".");
             catch ME
                 app.setStatus("Load CSV error: " + string(ME.message), true);
             end
@@ -615,9 +601,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 filename = fullfile(pathName, fileName);
                 app.PrescriptionTable.Data = load_prescription_mat_yu(filename);
                 app.SelectedPrescriptionRows = [];
-                app.Data = struct();
-                app.requestTrace();
-                app.setStatus("Loaded prescription MAT: " + string(filename), false);
+                app.markDirty("Loaded prescription MAT: " + string(filename) + ".");
             catch ME
                 app.setStatus("Load MAT error: " + string(ME.message), true);
             end
@@ -625,8 +609,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function exportRayTableCsv(app)
             try
-                if isempty(app.Data) || isempty(fieldnames(app.Data))
-                    app.setStatus("Run Trace before exporting the ray table.", true);
+                if ~app.hasTraceData("Run Trace before exporting the ray table.")
                     return
                 end
 
@@ -639,7 +622,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 end
 
                 filename = fullfile(pathName, fileName);
-                nparaxial_export_table_csv_yu(app.makeRayExportTable(), filename);
+                filename = nparaxial_export_table_csv_yu( ...
+                    app.makeRayExportTable(), filename);
                 app.setStatus("Exported ray table CSV: " + string(filename), false);
             catch ME
                 app.setStatus("Export rays error: " + string(ME.message), true);
@@ -648,8 +632,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function exportSummaryTxt(app)
             try
-                if isempty(app.Data) || isempty(fieldnames(app.Data))
-                    app.setStatus("Run Trace before exporting the summary.", true);
+                if ~app.hasTraceData("Run Trace before exporting the summary.")
                     return
                 end
 
@@ -663,7 +646,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
                 filename = fullfile(pathName, fileName);
                 lines = app.summaryExportLines();
-                nparaxial_export_summary_txt_yu(lines, filename);
+                filename = nparaxial_export_summary_txt_yu(lines, filename);
                 app.setStatus("Exported summary TXT: " + string(filename), false);
             catch ME
                 app.setStatus("Export summary error: " + string(ME.message), true);
@@ -753,7 +736,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 lines = nparaxial_combined_report_yu( ...
                     app.Data.prescription, app.Data.matrixTable, ...
                     app.Data.img, app.Data.diagnostics, app.Data.summaryLines);
-                nparaxial_export_summary_txt_yu(lines, filename);
+                filename = nparaxial_export_summary_txt_yu(lines, filename);
                 app.setStatus("Exported first-order report TXT: " + ...
                     string(filename), false);
             catch ME
@@ -792,10 +775,13 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
                 data = app.computeCase(params, prescription, img);
                 app.Data = data;
+                app.IsDirty = false;
                 app.PrescriptionTable.Data = data.prescription;
                 app.refreshSelectedTab();
                 app.setStatus("Trace complete.", false);
             catch ME
+                app.IsDirty = true;
+                app.clearResults();
                 app.setStatus("Error: " + string(ME.message), true);
             end
         end
@@ -805,7 +791,65 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         end
 
         function requestTrace(app)
-            app.setStatus("Parameters changed. Press Run Trace.", false);
+            app.markDirty("");
+        end
+
+        function markDirty(app, reason)
+            app.IsDirty = true;
+            app.clearResults();
+            message = "Inputs changed. Run Trace to refresh diagnostics.";
+            if nargin >= 2 && strlength(string(reason)) > 0
+                message = string(reason) + " " + message;
+            end
+            app.setStatus(message, false);
+        end
+
+        function clearResults(app)
+            app.Data = struct();
+
+            staleText = {'Inputs changed. Run Trace to refresh diagnostics.'};
+            if ~isempty(app.RayAxes) && isvalid(app.RayAxes)
+                cla(app.RayAxes);
+                title(app.RayAxes, 'Run Trace to refresh diagnostics');
+                xlabel(app.RayAxes, 'z');
+                ylabel(app.RayAxes, 'y');
+            end
+            if ~isempty(app.SummaryTextArea) && isvalid(app.SummaryTextArea)
+                app.SummaryTextArea.Value = staleText;
+            end
+            if ~isempty(app.MatrixTable) && isvalid(app.MatrixTable)
+                app.MatrixTable.Data = table();
+            end
+            if ~isempty(app.CardinalTextArea) && isvalid(app.CardinalTextArea)
+                app.CardinalTextArea.Value = staleText;
+            end
+            if ~isempty(app.CardinalTable) && isvalid(app.CardinalTable)
+                app.CardinalTable.Data = table();
+            end
+            if ~isempty(app.PupilTextArea) && isvalid(app.PupilTextArea)
+                app.PupilTextArea.Value = staleText;
+            end
+            if ~isempty(app.PupilCandidateTable) && isvalid(app.PupilCandidateTable)
+                app.PupilCandidateTable.Data = table();
+            end
+            if ~isempty(app.ChiefTextArea) && isvalid(app.ChiefTextArea)
+                app.ChiefTextArea.Value = staleText;
+            end
+            if ~isempty(app.ChiefRayTable) && isvalid(app.ChiefRayTable)
+                app.ChiefRayTable.Data = table();
+            end
+            if ~isempty(app.ChiefEventTable) && isvalid(app.ChiefEventTable)
+                app.ChiefEventTable.Data = table();
+            end
+            if ~isempty(app.InvariantTextArea) && isvalid(app.InvariantTextArea)
+                app.InvariantTextArea.Value = staleText;
+            end
+            if ~isempty(app.InvariantSummaryTable) && isvalid(app.InvariantSummaryTable)
+                app.InvariantSummaryTable.Data = table();
+            end
+            if ~isempty(app.PhaseSpaceTable) && isvalid(app.PhaseSpaceTable)
+                app.PhaseSpaceTable.Data = table();
+            end
         end
 
         function params = readParameters(app)
@@ -1174,10 +1218,17 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         end
 
         function ok = hasTraceData(app, message)
-            ok = ~(isempty(app.Data) || isempty(fieldnames(app.Data)));
-            if ~ok
-                app.setStatus(message, true);
+            ok = false;
+            if app.IsDirty
+                app.setStatus( ...
+                    "Inputs changed. Run Trace to refresh diagnostics.", true);
+                return
             end
+            if isempty(app.Data) || isempty(fieldnames(app.Data))
+                app.setStatus(message, true);
+                return
+            end
+            ok = true;
         end
 
         function exportTableCsvWithDialog(app, T, defaultName, titleText, statusText)
@@ -1194,7 +1245,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
 
             filename = fullfile(pathName, fileName);
-            nparaxial_export_table_csv_yu(T, filename);
+            filename = nparaxial_export_table_csv_yu(T, filename);
             app.setStatus(string(statusText) + ": " + string(filename), false);
         end
 
@@ -1766,7 +1817,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     '----------------------------'
                     sprintf('Diagnostic field height y = %.6g', diag.diagnostic_field_y)
                     sprintf('Field label: %s', diag.field_label)
-                    'Diagnostics are currently axial unless otherwise stated.'
+                    'Rays are traced for the selected diagnostic field height; aperture stop selection remains axial.'
                     char(diag.off_axis_warning)
                     char("Chief/marginal diagnostics unavailable: " + diag.chief_error)
                     };
@@ -1784,7 +1835,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '----------------------------'
                 sprintf('Diagnostic field height y = %.6g', diag.diagnostic_field_y)
                 sprintf('Field label: %s', diag.field_label)
-                'Diagnostics are currently axial unless otherwise stated.'
+                'Rays are traced for the selected diagnostic field height; aperture stop selection remains axial.'
                 char(diag.off_axis_warning)
                 sprintf('Selected stop: %s (%s), z = %.6g, radius = %.6g', ...
                     stopEvent.element_id(1), stopEvent.type(1), ...
@@ -1798,14 +1849,15 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             diag = app.Data.diagnostics;
             if strlength(diag.invariant_error) > 0 || isempty(diag.invariant)
                 app.InvariantTextArea.Value = { ...
-                    'Invariant / phase-space diagnostics'
-                    '-----------------------------------'
-                    sprintf('Diagnostic field height y = %.6g', diag.diagnostic_field_y)
-                    sprintf('Field label: %s', diag.field_label)
-                    'Invariant uses canonical p = n*u.'
-                    'Raw y-u area is not conserved across refractive-index changes.'
-                    'Invariant conservation is meaningful only where invariant_valid is true.'
-                    char(diag.off_axis_warning)
+                'Invariant / phase-space diagnostics'
+                '-----------------------------------'
+                sprintf('Diagnostic field height y = %.6g', diag.diagnostic_field_y)
+                sprintf('Field label: %s', diag.field_label)
+                'Invariant uses canonical p = n*u.'
+                'Rays are traced for the selected diagnostic field height; aperture stop selection remains axial.'
+                'Raw y-u area is not conserved across refractive-index changes.'
+                'Invariant conservation is meaningful only where invariant_valid is true.'
+                char(diag.off_axis_warning)
                     char("Invariant diagnostics unavailable: " + diag.invariant_error)
                     };
                 app.InvariantSummaryTable.Data = table( ...
@@ -1828,7 +1880,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '-----------------------------------'
                 sprintf('Diagnostic field height y = %.6g', diag.diagnostic_field_y)
                 sprintf('Field label: %s', diag.field_label)
-                'Diagnostics are currently axial unless otherwise stated.'
+                'Rays are traced for the selected diagnostic field height; aperture stop selection remains axial.'
                 char(diag.off_axis_warning)
                 stopText
                 'Invariant uses canonical p = n*u.'

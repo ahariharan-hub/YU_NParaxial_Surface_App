@@ -1,7 +1,7 @@
-function nparaxial_export_summary_txt_yu(lines, filename)
+function filename = nparaxial_export_summary_txt_yu(lines, filename)
 %NPARAXIAL_EXPORT_SUMMARY_TXT_YU Write cell/string report lines to TXT.
 
-    filename = filename_local(filename);
+    filename = filename_local(filename, '.txt');
     lines = string(lines(:));
 
     fid = fopen(filename, 'w');
@@ -16,9 +16,13 @@ function nparaxial_export_summary_txt_yu(lines, filename)
 end
 
 
-function filename = filename_local(filename)
+function filename = filename_local(filename, extension)
     if ~(ischar(filename) || isstring(filename)) || ~isscalar(string(filename))
         error('filename must be a text scalar.');
     end
     filename = char(filename);
+    if length(filename) < length(extension) || ...
+            ~strcmpi(filename(end-length(extension)+1:end), extension)
+        filename = [filename, extension];
+    end
 end
