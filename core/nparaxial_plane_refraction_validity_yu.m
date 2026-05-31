@@ -2,7 +2,9 @@ function diag = nparaxial_plane_refraction_validity_yu(n1, n2, u_in, tol)
 %NPARAXIAL_PLANE_REFRACTION_VALIDITY_YU Plane-interface Snell diagnostic.
 %
 % This is diagnostic only. Total internal reflection does not alter the
-% paraxial trace result.
+% paraxial trace result. Values slightly outside [-1, 1] within tolerance
+% are clamped for numerical robustness; abs(arg) > 1 + tol is reported as
+% total internal reflection.
 
     if nargin < 4 || isempty(tol)
         tol = 1e-12;
@@ -20,8 +22,9 @@ function diag = nparaxial_plane_refraction_validity_yu(n1, n2, u_in, tol)
 
     uOutExact = NaN(size(u_in));
     valid = ~tirFlag & isfinite(arg);
-    argClamped = min(max(arg(valid), -1), 1);
-    uOutExact(valid) = asin(argClamped);
+    argClamped = NaN(size(u_in));
+    argClamped(valid) = min(max(arg(valid), -1), 1);
+    uOutExact(valid) = asin(argClamped(valid));
     deltaU = uOutExact - uOutParaxial;
 
     inMetrics = nparaxial_angle_validity_metrics_yu(u_in, tol);
@@ -39,6 +42,7 @@ function diag = nparaxial_plane_refraction_validity_yu(n1, n2, u_in, tol)
     diag.u_in = u_in;
     diag.u_out_paraxial = uOutParaxial;
     diag.snell_argument = arg;
+    diag.snell_argument_clamped = argClamped;
     diag.u_out_exact = uOutExact;
     diag.delta_u = deltaU;
     diag.tir_flag = tirFlag;

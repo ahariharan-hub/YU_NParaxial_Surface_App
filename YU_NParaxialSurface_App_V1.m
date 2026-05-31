@@ -672,7 +672,10 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   If the selected field is fully vignetted, no invalid fan is generated.'
                 '   If the interval is unbounded, the app falls back to the manual fan.'
                 '   Aperture-limited means geometrically admitted, not paraxial-valid.'
-                '   Paraxial-validity diagnostics are deferred to a later milestone.'
+                '   Milestone 2.3.3 includes propagation penalty, small-angle metrics,'
+                '   plane-refraction scalar diagnostics, and thin-lens angle/deflection diagnostics.'
+                '   Spherical-surface scalar validity is deferred to Milestone 2.3.4.'
+                '   True spherical-surface intersection validity is deferred to a later milestone.'
                 ''
                 '9. System matrix chain'
                 '   The System Matrix tab displays the final ABCD matrix and a matrix chain.'
@@ -727,6 +730,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   Translation penalty: delta_y = d*(tan(u)-u).'
                 '   Plane refraction comparison: u2_p = (n1/n2)*u1.'
                 '   Exact scalar comparison: u2_exact = asin((n1/n2)*sin(u1)).'
+                '   TIR diagnostic: abs((n1/n2)*sin(u1)) > 1 + tol.'
+                '   Near-boundary Snell arguments may be clamped within tolerance.'
                 '   Thin lenses have no unique exact Snell reference in this app.'
                 '   Thin-lens validity reports u_in, deflection -y/f, and u_out.'
                 '   Spherical-surface scalar validity is deferred to Milestone 2.3.4.'
@@ -2381,6 +2386,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 sprintf('Worst warning level = %s', worstLevel)
                 'Aperture-limited means admitted by apertures, not paraxial-valid.'
                 'Spherical-surface scalar validity is deferred to Milestone 2.3.4.'
+                'Thresholds: ok <=0.05 rad and rel tan error <1e-3; notice <=0.10 rad or <5e-3; warning <=0.20 rad or <2e-2; severe otherwise, TIR, invalid asin, tan singularity, or nonfinite values.'
                 ''
                 };
             lines = [lines; cellstr(validity.note(:))];

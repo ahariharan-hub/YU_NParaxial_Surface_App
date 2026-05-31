@@ -19,6 +19,7 @@ function segmentTable = nparaxial_trace_segments_table_yu(bundleSet, tol)
     yStart = zeros(0, 1);
     yEnd = zeros(0, 1);
     uVals = zeros(0, 1);
+    segmentKind = strings(0, 1);
 
     for q = 1:numel(bundleSet)
         if ~isfield(bundleSet(q), 'bundle')
@@ -43,17 +44,22 @@ function segmentTable = nparaxial_trace_segments_table_yu(bundleSet, tol)
                 segmentIndex(end+1, 1) = s; %#ok<AGROW>
                 zStart(end+1, 1) = zSeg(1); %#ok<AGROW>
                 zEnd(end+1, 1) = zSeg(end); %#ok<AGROW>
-                dVals(end+1, 1) = zSeg(end) - zSeg(1); %#ok<AGROW>
+                d = zSeg(end) - zSeg(1);
+                dVals(end+1, 1) = d; %#ok<AGROW>
                 nVals(end+1, 1) = segment_medium_local(res, s); %#ok<AGROW>
                 yStart(end+1, 1) = ySeg(1); %#ok<AGROW>
                 yEnd(end+1, 1) = ySeg(end); %#ok<AGROW>
                 uVals(end+1, 1) = segment_slope_local(res, s); %#ok<AGROW>
+                segmentKind(end+1, 1) = ...
+                    segment_kind_local(res, s, d, tol); %#ok<AGROW>
             end
         end
     end
 
     metrics = nparaxial_angle_validity_metrics_yu(uVals, tol);
     deltaY = dVals .* metrics.tan_minus_u;
+    isZeroLength = abs(dVals) <= tol;
+    deltaY(isZeroLength) = 0;
     levels = nparaxial_validity_warning_level_yu( ...
         uVals, metrics.relative_tan_error, false(size(uVals)), ...
         ~metrics.numeric_valid | ~metrics.tan_valid);
@@ -65,6 +71,8 @@ function segmentTable = nparaxial_trace_segments_table_yu(bundleSet, tol)
     segmentTable.z_start = zStart;
     segmentTable.z_end = zEnd;
     segmentTable.d = dVals;
+    segmentTable.segment_kind = segmentKind;
+    segmentTable.is_zero_length = isZeroLength;
     segmentTable.n = nVals;
     segmentTable.y_start = yStart;
     segmentTable.y_end_paraxial = yEnd;
@@ -77,6 +85,19 @@ function segmentTable = nparaxial_trace_segments_table_yu(bundleSet, tol)
     segmentTable.relative_sin_error = metrics.relative_sin_error;
     segmentTable.delta_y_translation = deltaY;
     segmentTable.warning_level = levels;
+end
+
+
+function kind = segment_kind_local(res, s, d, tol)
+    if abs(d) > tol
+        kind = "translation";
+        return
+    end
+    if isfield(res, 'events') && istable(res.events) && height(res.events) >= s
+        kind = "same_plane_angle_sample";
+    else
+        kind = "zero_length_final";
+    end
 end
 
 

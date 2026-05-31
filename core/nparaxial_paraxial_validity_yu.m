@@ -77,8 +77,9 @@ function summaryTable = build_summary_table_local(bundleSet, segmentTable, event
                 eventTable.field_index == fieldId;
             segRows = segmentTable(segMask, :);
             evtRows = eventTable(evtMask, :);
+            translationSegRows = translation_segments_local(segRows);
 
-            levels = [string(segRows.warning_level); ...
+            levels = [string(translationSegRows.warning_level); ...
                 string(evtRows.warning_level)];
             if isempty(levels)
                 levels = "ok";
@@ -94,7 +95,7 @@ function summaryTable = build_summary_table_local(bundleSet, segmentTable, event
             worstAngle(end+1, 1) = max_or_nan_local(angleValues); %#ok<AGROW>
 
             worstTranslation(end+1, 1) = signed_max_abs_local( ...
-                segRows.delta_y_translation); %#ok<AGROW>
+                translationSegRows.delta_y_translation); %#ok<AGROW>
             planeMask = evtRows.diagnostic_type == "plane_refraction";
             worstPlaneDelta(end+1, 1) = signed_max_abs_local( ...
                 evtRows.delta_u(planeMask)); %#ok<AGROW>
@@ -105,7 +106,8 @@ function summaryTable = build_summary_table_local(bundleSet, segmentTable, event
             warningCount(end+1, 1) = sum(levels == "warning"); %#ok<AGROW>
             noticeCount(end+1, 1) = sum(levels == "notice"); %#ok<AGROW>
             worstLevel(end+1, 1) = max_level_array_local(levels); %#ok<AGROW>
-            worstLocation(end+1, 1) = worst_location_local(segRows, evtRows); %#ok<AGROW>
+            worstLocation(end+1, 1) = worst_location_local( ...
+                translationSegRows, evtRows); %#ok<AGROW>
         end
     end
 
@@ -124,6 +126,21 @@ function summaryTable = build_summary_table_local(bundleSet, segmentTable, event
     summaryTable.notice_count = noticeCount;
     summaryTable.worst_warning_level = worstLevel;
     summaryTable.worst_location_note = worstLocation;
+end
+
+
+function rows = translation_segments_local(segRows)
+    rows = segRows;
+    if isempty(rows)
+        return
+    end
+    if ismember('segment_kind', rows.Properties.VariableNames)
+        rows = rows(rows.segment_kind == "translation", :);
+    elseif ismember('is_zero_length', rows.Properties.VariableNames)
+        rows = rows(~rows.is_zero_length, :);
+    else
+        rows = rows(abs(rows.d) > 0, :);
+    end
 end
 
 

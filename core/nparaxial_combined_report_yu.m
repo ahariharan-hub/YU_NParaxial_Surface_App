@@ -124,6 +124,7 @@ function lines = append_paraxial_validity_local(lines, validity)
         "It compares exact-angle scalar expressions with the paraxial quantities used by the current y-u model."
         "u is the paraxial ray angle in radians; no atan(u) reinterpretation is used."
         "Aperture-limited rays are geometrically admitted, not paraxial-validity certified."
+        "Spherical-surface scalar validity is deferred to Milestone 2.3.4."
         ];
     lines = append_section_local(lines, "Paraxial validity diagnostics", text);
     lines = append_table_local(lines, "Paraxial validity thresholds", ...

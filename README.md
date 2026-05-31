@@ -127,8 +127,11 @@ The Ray Diagram tab has a ray fan mode control:
 
 The aperture-limited fan means geometrically transmitted by the finite
 apertures in the prescription. It does not mean the ray is paraxial-valid.
-Paraxial-validity quantities such as `tan(u)-u`, `sin(u)-u`, and exact scalar
-Snell comparisons are intentionally deferred to the next diagnostics milestone.
+Milestone 2.3.3 includes propagation penalty, small-angle metrics,
+plane-refraction scalar diagnostics, and thin-lens angle/deflection
+diagnostics. Spherical-surface scalar validity remains deferred to Milestone
+2.3.4, and true spherical-surface intersection validity remains deferred to a
+later milestone.
 
 If the selected field is fully vignetted, the app does not generate an invalid
 `linspace` and reports that no transmitted aperture-limited ray fan exists. If
@@ -167,9 +170,10 @@ paraxial:                 u2_p = (n1/n2)*u1
 exact scalar comparison:  u2_exact = asin((n1/n2)*sin(u1))
 ```
 
-If `abs((n1/n2)*sin(u1)) > 1`, the diagnostic reports total internal
-reflection as a severe scalar-warning condition. This does not change the
-main paraxial trace.
+If `abs((n1/n2)*sin(u1)) > 1 + tol`, the diagnostic reports total internal
+reflection as a severe scalar-warning condition. Values slightly outside
+`[-1, 1]` within tolerance may be clamped for numerical robustness. This does
+not change the main paraxial trace.
 
 For thin lenses there is no unique exact Snell reference in this first-order
 model. The diagnostic reports `u_in`, paraxial deflection `-y/f`, `u_out`,
