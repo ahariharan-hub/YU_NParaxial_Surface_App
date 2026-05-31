@@ -76,6 +76,7 @@ After a trace is run, the app can export:
 - Cardinal diagnostics as CSV.
 - Stop and pupil diagnostics as CSV.
 - Vignetting interval diagnostics as CSV.
+- Paraxial validity diagnostics as CSV.
 - Chief/marginal ray diagnostics as CSV.
 - Invariant and phase-space diagnostics as CSV.
 - A combined first-order diagnostics report as TXT.
@@ -96,6 +97,13 @@ The core data helper functions are:
 - `nparaxial_vignetting_summary_yu`
 - `nparaxial_make_manual_fan_rays_yu`
 - `nparaxial_make_aperture_limited_rays_yu`
+- `nparaxial_angle_validity_metrics_yu`
+- `nparaxial_validity_warning_level_yu`
+- `nparaxial_trace_segments_table_yu`
+- `nparaxial_plane_refraction_validity_yu`
+- `nparaxial_thinlens_validity_yu`
+- `nparaxial_event_validity_yu`
+- `nparaxial_paraxial_validity_yu`
 - `nparaxial_matrix_chain_yu`
 - `nparaxial_matrix_chain_text_yu`
 - `nparaxial_matrix_to_text_yu`
@@ -126,6 +134,50 @@ If the selected field is fully vignetted, the app does not generate an invalid
 `linspace` and reports that no transmitted aperture-limited ray fan exists. If
 the admitted interval is unbounded or semi-infinite, the app falls back to the
 manual fixed-angle range and reports that fallback.
+
+## Paraxial Validity Diagnostics
+
+The Paraxial Validity tab is diagnostic only. Main tracing remains paraxial:
+translations still use `y2 = y1 + d*u`, thin lenses still use
+`u_out = u_in - y/f`, surface matrices remain first-order, and aperture
+clipping remains unchanged.
+
+The app convention is:
+
+```text
+y = ray height
+u = paraxial ray angle in radians
+```
+
+Do not reinterpret `u` as `theta = atan(u)`. The exact-angle expressions below
+are only scalar comparison diagnostics.
+
+For translation, the diagnostic compares:
+
+```text
+paraxial:                 y2_p = y1 + d*u
+exact-angle comparison:   y2_exact = y1 + d*tan(u)
+penalty:                  delta_y = d*(tan(u)-u)
+```
+
+For a plane refracting interface:
+
+```text
+paraxial:                 u2_p = (n1/n2)*u1
+exact scalar comparison:  u2_exact = asin((n1/n2)*sin(u1))
+```
+
+If `abs((n1/n2)*sin(u1)) > 1`, the diagnostic reports total internal
+reflection as a severe scalar-warning condition. This does not change the
+main paraxial trace.
+
+For thin lenses there is no unique exact Snell reference in this first-order
+model. The diagnostic reports `u_in`, paraxial deflection `-y/f`, `u_out`,
+and warning levels from angle/deflection magnitude only.
+
+Finite-radius spherical-surface scalar validity diagnostics are deferred to
+Milestone 2.3.4. Current finite-radius surface rows report
+`spherical_surface_deferred` and do not claim an exact spherical Snell result.
 
 ## First-Order Diagnostics
 
@@ -307,8 +359,8 @@ after-event slope and medium index.
 
 - Paraxial first-order model only.
 - Meridional y-z plane only.
-- No paraxial-validity penalty diagnostics yet.
-- No exact Snell tracing.
+- No exact Snell tracing in the main trace engine.
+- No finite-radius spherical-surface scalar validity diagnostic yet.
 - No aberration calculation.
 - No Seidel aberration diagnostics.
 - No support yet for final image planes before the last enabled element.

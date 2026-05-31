@@ -42,6 +42,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         CardinalTextArea matlab.ui.control.TextArea
         PupilTextArea matlab.ui.control.TextArea
         VignettingTextArea matlab.ui.control.TextArea
+        ValidityTextArea matlab.ui.control.TextArea
         ChiefTextArea matlab.ui.control.TextArea
         InvariantTextArea matlab.ui.control.TextArea
         MatrixTable matlab.ui.control.Table
@@ -50,6 +51,9 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         PupilCandidateTable matlab.ui.control.Table
         VignettingCandidateTable matlab.ui.control.Table
         VignettingCumulativeTable matlab.ui.control.Table
+        ValiditySummaryTable matlab.ui.control.Table
+        ValiditySegmentTable matlab.ui.control.Table
+        ValidityEventTable matlab.ui.control.Table
         ChiefRayTable matlab.ui.control.Table
         ChiefEventTable matlab.ui.control.Table
         InvariantSummaryTable matlab.ui.control.Table
@@ -392,6 +396,44 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.VignettingCumulativeTable.Layout.Row = 5;
             app.VignettingCumulativeTable.Layout.Column = 1;
 
+            validityTab = uitab(app.TabGroup, 'Title', 'Paraxial Validity');
+            validityGrid = uigridlayout(validityTab, [7 1]);
+            validityGrid.RowHeight = {110, 22, 120, 22, '1x', 22, '1x'};
+            validityGrid.Padding = [8 8 8 8];
+            validityGrid.RowSpacing = 8;
+            app.ValidityTextArea = uitextarea(validityGrid, ...
+                'Editable', 'off', ...
+                'FontName', 'Consolas');
+            app.ValidityTextArea.Layout.Row = 1;
+            app.ValidityTextArea.Layout.Column = 1;
+
+            validitySummaryLabel = uilabel(validityGrid, ...
+                'Text', 'Ray warning summary', ...
+                'FontWeight', 'bold');
+            validitySummaryLabel.Layout.Row = 2;
+            validitySummaryLabel.Layout.Column = 1;
+            app.ValiditySummaryTable = uitable(validityGrid);
+            app.ValiditySummaryTable.Layout.Row = 3;
+            app.ValiditySummaryTable.Layout.Column = 1;
+
+            validitySegmentLabel = uilabel(validityGrid, ...
+                'Text', 'Segment translation and small-angle metrics', ...
+                'FontWeight', 'bold');
+            validitySegmentLabel.Layout.Row = 4;
+            validitySegmentLabel.Layout.Column = 1;
+            app.ValiditySegmentTable = uitable(validityGrid);
+            app.ValiditySegmentTable.Layout.Row = 5;
+            app.ValiditySegmentTable.Layout.Column = 1;
+
+            validityEventLabel = uilabel(validityGrid, ...
+                'Text', 'Event validity diagnostics', ...
+                'FontWeight', 'bold');
+            validityEventLabel.Layout.Row = 6;
+            validityEventLabel.Layout.Column = 1;
+            app.ValidityEventTable = uitable(validityGrid);
+            app.ValidityEventTable.Layout.Row = 7;
+            app.ValidityEventTable.Layout.Column = 1;
+
             chiefTab = uitab(app.TabGroup, 'Title', 'Chief / Marginal Rays');
             chiefGrid = uigridlayout(chiefTab, [3 1]);
             chiefGrid.RowHeight = {86, 130, '1x'};
@@ -488,6 +530,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'MenuSelectedFcn', @(~, ~) app.exportInvariantPhaseCsv());
             uimenu(fileMenu, 'Text', 'Export Vignetting CSV', ...
                 'MenuSelectedFcn', @(~, ~) app.exportVignettingCsv());
+            uimenu(fileMenu, 'Text', 'Export Paraxial Validity CSV', ...
+                'MenuSelectedFcn', @(~, ~) app.exportParaxialValidityCsv());
             uimenu(fileMenu, 'Text', 'Export Combined First-Order Report TXT', ...
                 'MenuSelectedFcn', @(~, ~) app.exportCombinedFirstOrderReportTxt());
 
@@ -502,6 +546,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Stops / Pupils"));
             uimenu(viewMenu, 'Text', 'Show Vignetting', ...
                 'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Vignetting"));
+            uimenu(viewMenu, 'Text', 'Show Paraxial Validity', ...
+                'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Paraxial Validity"));
             uimenu(viewMenu, 'Text', 'Show Equations', ...
                 'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Equations"));
             uimenu(viewMenu, 'Text', 'Refresh Current View', ...
@@ -614,6 +660,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   Ray result tables can be exported as CSV after a trace is run.'
                 '   The text summary can be exported after a trace is run.'
                 '   Diagnostic tables can be exported as CSV by diagnostic tab group.'
+                '   Paraxial validity diagnostics can be exported as CSV.'
                 '   A combined first-order diagnostics report can be exported as TXT.'
                 '   Prescription editing lives in one authoritative Ray Diagram tab table.'
                 '   The File menu handles prescription import/export and diagnostic export.'
@@ -672,7 +719,19 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   Lower and upper cone limits may be set by different apertures.'
                 '   This is first-order meridional vignetting, not full 3D pupil analysis.'
                 ''
-                '13. Chief, marginal, and invariant diagnostics'
+                '13. Paraxial validity diagnostics'
+                '   Diagnostic only: main tracing remains paraxial.'
+                '   u is the paraxial ray angle in radians; no atan(u) reinterpretation is used.'
+                '   Translation comparison: y2_p = y1 + d*u.'
+                '   Exact-angle scalar comparison: y2_exact = y1 + d*tan(u).'
+                '   Translation penalty: delta_y = d*(tan(u)-u).'
+                '   Plane refraction comparison: u2_p = (n1/n2)*u1.'
+                '   Exact scalar comparison: u2_exact = asin((n1/n2)*sin(u1)).'
+                '   Thin lenses have no unique exact Snell reference in this app.'
+                '   Thin-lens validity reports u_in, deflection -y/f, and u_out.'
+                '   Spherical-surface scalar validity is deferred to Milestone 2.3.4.'
+                ''
+                '14. Chief, marginal, and invariant diagnostics'
                 '   Chief ray targets y_stop = 0.'
                 '   Upper and lower marginal rays target +a_stop and -a_stop.'
                 '   These stop-targeted rays are distinct from vignetting interval limits.'
@@ -683,17 +742,17 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   Invariant conservation is meaningful only where invariant_valid is true.'
                 '   Event-plane invariant samples are labeled state_side = after_event.'
                 ''
-                '14. Image solve'
+                '15. Image solve'
                 '   Build M_ref = [A B; C D] from object plane to z_ref.'
                 '   z_ref is the last enabled element position.'
                 '   After translating by x: B_total = B + x*D.'
                 '   The image condition is B_total = 0, so x = -B/D.'
                 '   This milestone accepts only z_img >= z_ref.'
                 ''
-                '15. Current limitations'
+                '16. Current limitations'
                 '   Paraxial first-order model only.'
-                '   No exact Snell tracing.'
-                '   No paraxial-validity penalty diagnostics yet.'
+                '   No exact Snell tracing in the main trace engine.'
+                '   No spherical-surface scalar validity diagnostic yet.'
                 '   No aberration calculation.'
                 '   No advanced pupil diagnostics.'
                 '   No full 3D pupil or field-of-view analysis.'
@@ -953,6 +1012,22 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
         end
 
+        function exportParaxialValidityCsv(app)
+            try
+                if ~app.hasTraceData("Run Trace before exporting paraxial-validity data.")
+                    return
+                end
+                app.exportTableCsvWithDialog( ...
+                    app.makeParaxialValidityExportTable(), ...
+                    'nparaxial_validity.csv', ...
+                    'Export Paraxial Validity CSV', ...
+                    'Exported paraxial-validity CSV');
+            catch ME
+                app.setStatus("Export paraxial validity error: " + ...
+                    string(ME.message), true);
+            end
+        end
+
         function exportCombinedFirstOrderReportTxt(app)
             try
                 if ~app.hasTraceData("Run Trace before exporting the first-order report.")
@@ -1102,6 +1177,18 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             if ~isempty(app.VignettingCumulativeTable) && isvalid(app.VignettingCumulativeTable)
                 app.VignettingCumulativeTable.Data = table();
             end
+            if ~isempty(app.ValidityTextArea) && isvalid(app.ValidityTextArea)
+                app.ValidityTextArea.Value = staleText;
+            end
+            if ~isempty(app.ValiditySummaryTable) && isvalid(app.ValiditySummaryTable)
+                app.ValiditySummaryTable.Data = table();
+            end
+            if ~isempty(app.ValiditySegmentTable) && isvalid(app.ValiditySegmentTable)
+                app.ValiditySegmentTable.Data = table();
+            end
+            if ~isempty(app.ValidityEventTable) && isvalid(app.ValidityEventTable)
+                app.ValidityEventTable.Data = table();
+            end
             if ~isempty(app.ChiefTextArea) && isvalid(app.ChiefTextArea)
                 app.ChiefTextArea.Value = staleText;
             end
@@ -1246,6 +1333,15 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 params, prescription, img, primaryStop, fieldTable);
             diagnostics = app.computeFirstOrderDiagnostics( ...
                 params, prescription, img);
+            try
+                diagnostics.paraxial_validity = ...
+                    nparaxial_paraxial_validity_yu( ...
+                    bundleSet, prescription, [], 1e-12);
+                diagnostics.paraxial_validity_error = "";
+            catch ME
+                diagnostics.paraxial_validity = [];
+                diagnostics.paraxial_validity_error = string(ME.message);
+            end
 
             data = struct();
             data.params = params;
@@ -1679,6 +1775,39 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 vig.cumulative_table, "vignetting_cumulative")];
         end
 
+        function T = makeParaxialValidityExportTable(app)
+            diag = app.Data.diagnostics;
+            if ~isfield(diag, 'paraxial_validity') || ...
+                    isempty(diag.paraxial_validity)
+                error('Paraxial-validity diagnostics are unavailable.');
+            end
+            validity = diag.paraxial_validity;
+
+            context = table;
+            context.quantity = [
+                "status_text"
+                "ray_fan_mode"
+                "diagnostic_field_y"
+                "note"
+            ];
+            context.value = [
+                string(validity.status_text)
+                string(app.Data.rayFanLabel)
+                string(diag.diagnostic_field_y)
+                "Diagnostic only: main tracing remains paraxial."
+            ];
+
+            T = app.flattenTableForExport(context, "context");
+            T = [T; app.flattenTableForExport( ...
+                validity.threshold_table, "thresholds")];
+            T = [T; app.flattenTableForExport( ...
+                validity.summary_table, "validity_summary")];
+            T = [T; app.flattenTableForExport( ...
+                validity.segment_table, "validity_segments")];
+            T = [T; app.flattenTableForExport( ...
+                validity.event_table, "validity_events")];
+        end
+
         function T = flattenTableForExport(app, sourceTable, sectionName)
             section = strings(0, 1);
             item = strings(0, 1);
@@ -1916,6 +2045,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     app.updatePupilDiagnostics();
                 case "Vignetting"
                     app.updateVignettingDiagnostics();
+                case "Paraxial Validity"
+                    app.updateParaxialValidityDiagnostics();
                 case "Chief / Marginal Rays"
                     app.updateChiefMarginalDiagnostics();
                 case "Invariant / Phase Space"
@@ -2208,6 +2339,57 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.VignettingCumulativeTable.Data = diag.vignetting.cumulative_table;
         end
 
+        function updateParaxialValidityDiagnostics(app)
+            diag = app.Data.diagnostics;
+            if ~isfield(diag, 'paraxial_validity') || ...
+                    isempty(diag.paraxial_validity) || ...
+                    (isfield(diag, 'paraxial_validity_error') && ...
+                    strlength(diag.paraxial_validity_error) > 0)
+                message = "";
+                if isfield(diag, 'paraxial_validity_error')
+                    message = diag.paraxial_validity_error;
+                end
+                app.ValidityTextArea.Value = { ...
+                    'Paraxial validity diagnostics'
+                    '-----------------------------'
+                    'Diagnostic only: main tracing remains paraxial.'
+                    'u is the paraxial ray angle in radians.'
+                    char("Diagnostics unavailable: " + message)
+                    };
+                app.ValiditySummaryTable.Data = table();
+                app.ValiditySegmentTable.Data = table();
+                app.ValidityEventTable.Data = table();
+                return
+            end
+
+            validity = diag.paraxial_validity;
+            worstLevel = "ok";
+            raysEvaluated = 0;
+            if ~isempty(validity.summary_table)
+                raysEvaluated = height(validity.summary_table);
+                worstLevel = app.maxWarningLevel( ...
+                    validity.summary_table.worst_warning_level);
+            end
+            lines = {
+                'Paraxial validity diagnostics'
+                '-----------------------------'
+                'Diagnostic only: main tracing remains paraxial.'
+                'u is the paraxial ray angle in radians; no atan(u) reinterpretation is used.'
+                sprintf('Ray fan mode: %s', app.Data.rayFanLabel)
+                sprintf('Diagnostic field height y = %.6g', diag.diagnostic_field_y)
+                sprintf('Rays evaluated = %d', raysEvaluated)
+                sprintf('Worst warning level = %s', worstLevel)
+                'Aperture-limited means admitted by apertures, not paraxial-valid.'
+                'Spherical-surface scalar validity is deferred to Milestone 2.3.4.'
+                ''
+                };
+            lines = [lines; cellstr(validity.note(:))];
+            app.ValidityTextArea.Value = lines;
+            app.ValiditySummaryTable.Data = validity.summary_table;
+            app.ValiditySegmentTable.Data = validity.segment_table;
+            app.ValidityEventTable.Data = validity.event_table;
+        end
+
         function updateChiefMarginalDiagnostics(app)
             diag = app.Data.diagnostics;
             if strlength(diag.chief_error) > 0 || isempty(diag.chief_marginal)
@@ -2289,6 +2471,20 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 };
             app.InvariantSummaryTable.Data = diag.invariant.summary;
             app.PhaseSpaceTable.Data = diag.phase_space;
+        end
+
+        function level = maxWarningLevel(~, levels)
+            levels = string(levels(:));
+            scores = zeros(numel(levels), 1);
+            scores(levels == "notice") = 1;
+            scores(levels == "warning") = 2;
+            scores(levels == "severe") = 3;
+            names = ["ok"; "notice"; "warning"; "severe"];
+            if isempty(scores)
+                level = "ok";
+            else
+                level = names(max(scores) + 1);
+            end
         end
 
         function setStatus(app, message, isError)

@@ -63,6 +63,16 @@ function lines = nparaxial_combined_report_yu( ...
             "Unavailable: " + diagnostics.vignetting_error);
     end
 
+    if isfield(diagnostics, 'paraxial_validity') && ...
+            ~isempty(diagnostics.paraxial_validity)
+        lines = append_paraxial_validity_local(lines, ...
+            diagnostics.paraxial_validity);
+    elseif isfield(diagnostics, 'paraxial_validity_error') && ...
+            strlength(diagnostics.paraxial_validity_error) > 0
+        lines = append_section_local(lines, "Paraxial validity diagnostics", ...
+            "Unavailable: " + diagnostics.paraxial_validity_error);
+    end
+
     if isempty(diagnostics.chief_marginal)
         lines = append_section_local(lines, "Chief/marginal", ...
             "Unavailable: " + diagnostics.chief_error);
@@ -91,8 +101,8 @@ function lines = nparaxial_combined_report_yu( ...
         "Paraxial first-order model only."
         "Meridional y-z plane only."
         "Aperture-limited fan rays are geometrically admitted, not paraxial-validity certified."
-        "No paraxial-validity penalty diagnostics yet."
-        "No exact Snell tracing."
+        "No exact Snell tracing in the main trace engine."
+        "No finite-radius spherical-surface scalar validity diagnostic yet."
         "No Seidel aberration calculation."
         "No lithography optimization."
         "Axial aperture stop selection remains distinct from off-axis lower/upper cone limiting apertures."
@@ -104,6 +114,26 @@ function lines = nparaxial_combined_report_yu( ...
         warnings(end+1, 1) = "Off-axis note: " + diagnostics.off_axis_warning;
     end
     lines = append_section_local(lines, "Limitations/warnings", warnings);
+end
+
+
+function lines = append_paraxial_validity_local(lines, validity)
+    text = [
+        string(validity.status_text)
+        "This is not exact ray tracing."
+        "It compares exact-angle scalar expressions with the paraxial quantities used by the current y-u model."
+        "u is the paraxial ray angle in radians; no atan(u) reinterpretation is used."
+        "Aperture-limited rays are geometrically admitted, not paraxial-validity certified."
+        ];
+    lines = append_section_local(lines, "Paraxial validity diagnostics", text);
+    lines = append_table_local(lines, "Paraxial validity thresholds", ...
+        validity.threshold_table);
+    lines = append_table_local(lines, "Paraxial validity ray summary", ...
+        validity.summary_table);
+    lines = append_table_local(lines, "Paraxial validity segments", ...
+        validity.segment_table);
+    lines = append_table_local(lines, "Paraxial validity events", ...
+        validity.event_table);
 end
 
 
