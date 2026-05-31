@@ -5,22 +5,36 @@ function summary = nparaxial_vignetting_summary_yu(vig)
         error('vig must be a vignetting diagnostics struct.');
     end
 
+    if vig.fully_vignetted
+        intervalText = 'Final u0 interval = empty (no transmitted launch-slope interval)';
+        centerText = 'Interval center = undefined';
+        semiWidthText = 'Interval semi-width = undefined';
+    else
+        intervalText = sprintf('Final u0 interval = [%.12g, %.12g]', ...
+            vig.u_low, vig.u_high);
+        centerText = sprintf('Interval center = %.12g', vig.u_center);
+        semiWidthText = sprintf('Interval semi-width = %.12g', ...
+            vig.u_semi_width);
+    end
+
     lines = {
         'Vignetting interval diagnostics'
         '--------------------------------'
         sprintf('Object field height y = %.6g', vig.y_obj)
         'First-order meridional y-u diagnostics.'
         'Lower and upper cone limits may be set by different apertures.'
-        sprintf('Final u0 interval = [%.12g, %.12g]', ...
-            vig.u_low, vig.u_high)
-        sprintf('Interval center = %.12g', vig.u_center)
-        sprintf('Interval semi-width = %.12g', vig.u_semi_width)
+        intervalText
+        centerText
+        semiWidthText
         sprintf('Fully vignetted = %s', logical_text_local(vig.fully_vignetted))
         sprintf('Lower limiting aperture = %s', vig.lower_bound_element_id)
         sprintf('Upper limiting aperture = %s', vig.upper_bound_element_id)
         sprintf('Symmetric about u0 = 0 = %s', logical_text_local(vig.is_symmetric))
         sprintf('Partially vignetted relative to axial = %s', ...
             logical_text_local(vig.partially_vignetted_relative_to_axial))
+        ['Partially vignetted relative to axial means reduced launch-cone ', ...
+        'width/semi-width relative to the axial interval; a shifted interval ', ...
+        'with unchanged width is not partial vignetting by this flag.']
         char(vig.note)
         };
 

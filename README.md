@@ -181,6 +181,12 @@ stop, and the interval-center ray is not labeled as the classical chief ray
 unless it also targets the selected stop center. This is first-order
 meridional vignetting, not full 3D pupil or field-of-view analysis.
 
+`partially_vignetted_relative_to_axial` means the final launch-cone
+width/semi-width is reduced relative to the axial interval. It does not mean
+mere decentering or shifting of the interval. If multiple apertures impose
+the same lower or upper bound within tolerance, the current implementation
+reports the first encountered event in sorted `z`, `event_order`, row order.
+
 For a selected stop, the event sequence is split by event identity
 (`event_index`), not by `z` alone. This matters when multiple elements share
 one plane.

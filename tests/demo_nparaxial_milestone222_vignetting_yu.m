@@ -9,13 +9,15 @@ function result = demo_nparaxial_milestone222_vignetting_yu()
     test_stop_only_off_axis_local();
     test_two_apertures_different_limits_local();
     test_fully_vignetted_local();
+    test_cumulative_disjoint_fully_vignetted_local();
     test_same_z_event_order_local();
     test_powered_aperture_pre_event_height_local();
+    test_surface_aperture_pre_event_height_local();
     appVignettingSmoke = test_app_vignetting_tab_smoke_local(rootFolder);
 
     result = struct();
     result.case_name = "milestone222_vignetting";
-    result.num_checks = 7;
+    result.num_checks = 9;
     result.app_vignetting_smoke = appVignettingSmoke;
 end
 
@@ -45,6 +47,11 @@ function test_stop_only_off_axis_local()
         'Stop-only off-axis upper interval mismatch.');
     assert(~vig.is_symmetric, ...
         'Off-axis stop-only interval should be shifted from u0 = 0.');
+    assert_close_local(vig.u_high - vig.u_low, ...
+        vig.axial_u_high - vig.axial_u_low, ...
+        'Stop-only off-axis interval width should match axial width.');
+    assert(~vig.partially_vignetted_relative_to_axial, ...
+        'A shifted stop-only interval with unchanged width is not partial vignetting.');
 end
 
 
@@ -76,11 +83,34 @@ end
 function test_fully_vignetted_local()
     p = prescription_local("STOP", 1, "stop", 0, 5, Inf, Inf);
     vig = nparaxial_vignetting_intervals_yu(p, 0, 10);
+    summary = nparaxial_vignetting_summary_yu(vig);
+    summaryText = strjoin(string(summary.lines), newline);
 
     assert(vig.fully_vignetted, ...
         'Field should be fully vignetted by an object-plane stop.');
     assert(vig.u_low > vig.u_high, ...
         'Fully vignetted interval should be empty.');
+    assert(contains(summaryText, "empty"), ...
+        'Fully vignetted summary should say the final interval is empty.');
+    assert(~contains(summaryText, "[Inf, -Inf]"), ...
+        'Fully vignetted summary should not display [Inf, -Inf].');
+end
+
+
+function test_cumulative_disjoint_fully_vignetted_local()
+    p = prescription_local( ...
+        ["STOP1"; "STOP2"], [1; 2], ["stop"; "stop"], ...
+        [10; 20], [0.5; 0.5], [Inf; Inf], [Inf; Inf]);
+    vig = nparaxial_vignetting_intervals_yu(p, 0, 2);
+
+    assert(all(~vig.candidate_table.interval_empty), ...
+        'Each individual aperture interval should be nonempty.');
+    assert(vig.fully_vignetted, ...
+        'Disjoint cumulative aperture intervals should fully vignette the field.');
+    assert(vig.u_low > vig.u_high, ...
+        'Disjoint cumulative interval should be empty.');
+    assert(vig.lower_bound_element_id ~= vig.upper_bound_element_id, ...
+        'Disjoint interval lower and upper bounds should come from different apertures.');
 end
 
 
@@ -108,6 +138,21 @@ function test_powered_aperture_pre_event_height_local()
 end
 
 
+function test_surface_aperture_pre_event_height_local()
+    p = prescription_with_media_local("S1", 1, "surface", 10, 5, Inf, 20, 1, 1.5);
+    vig = nparaxial_vignetting_intervals_yu(p, 0, 1);
+
+    assert_close_local(vig.candidate_table.A_to_aperture(1), 1, ...
+        'Surface aperture should use pre-event A coefficient.');
+    assert_close_local(vig.candidate_table.B_to_aperture(1), 10, ...
+        'Surface aperture should use pre-event B coefficient.');
+    assert_close_local(vig.u_low, -0.6, ...
+        'Surface aperture lower bound should use pre-event height.');
+    assert_close_local(vig.u_high, 0.4, ...
+        'Surface aperture upper bound should use pre-event height.');
+end
+
+
 function p = prescription_local(elementId, eventOrder, typeName, z, aperture, f, R)
     n = numel(string(elementId));
     p = table;
@@ -121,6 +166,16 @@ function p = prescription_local(elementId, eventOrder, typeName, z, aperture, f,
     p.n_before = ones(n, 1);
     p.n_after = ones(n, 1);
     p.enabled = true(n, 1);
+    p = nparaxial_validate_prescription_yu(p);
+end
+
+
+function p = prescription_with_media_local( ...
+    elementId, eventOrder, typeName, z, aperture, f, R, nBefore, nAfter)
+
+    p = prescription_local(elementId, eventOrder, typeName, z, aperture, f, R);
+    p.n_before = expand_double_local(nBefore, height(p));
+    p.n_after = expand_double_local(nAfter, height(p));
     p = nparaxial_validate_prescription_yu(p);
 end
 

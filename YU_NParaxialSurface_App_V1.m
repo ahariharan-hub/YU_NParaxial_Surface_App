@@ -252,8 +252,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.PupilCandidateTable.Layout.Column = 1;
 
             vignettingTab = uitab(app.TabGroup, 'Title', 'Vignetting');
-            vignettingGrid = uigridlayout(vignettingTab, [3 1]);
-            vignettingGrid.RowHeight = {150, '1x', '1x'};
+            vignettingGrid = uigridlayout(vignettingTab, [5 1]);
+            vignettingGrid.RowHeight = {150, 22, '1x', 22, '1x'};
             vignettingGrid.Padding = [8 8 8 8];
             vignettingGrid.RowSpacing = 8;
             app.VignettingTextArea = uitextarea(vignettingGrid, ...
@@ -261,11 +261,23 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'FontName', 'Consolas');
             app.VignettingTextArea.Layout.Row = 1;
             app.VignettingTextArea.Layout.Column = 1;
+
+            candidateLabel = uilabel(vignettingGrid, ...
+                'Text', 'Candidate aperture intervals', ...
+                'FontWeight', 'bold');
+            candidateLabel.Layout.Row = 2;
+            candidateLabel.Layout.Column = 1;
             app.VignettingCandidateTable = uitable(vignettingGrid);
-            app.VignettingCandidateTable.Layout.Row = 2;
+            app.VignettingCandidateTable.Layout.Row = 3;
             app.VignettingCandidateTable.Layout.Column = 1;
+
+            cumulativeLabel = uilabel(vignettingGrid, ...
+                'Text', 'Cumulative interval intersection', ...
+                'FontWeight', 'bold');
+            cumulativeLabel.Layout.Row = 4;
+            cumulativeLabel.Layout.Column = 1;
             app.VignettingCumulativeTable = uitable(vignettingGrid);
-            app.VignettingCumulativeTable.Layout.Row = 3;
+            app.VignettingCumulativeTable.Layout.Row = 5;
             app.VignettingCumulativeTable.Layout.Column = 1;
 
             chiefTab = uitab(app.TabGroup, 'Title', 'Chief / Marginal Rays');
