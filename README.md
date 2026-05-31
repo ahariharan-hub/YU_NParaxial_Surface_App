@@ -1,6 +1,6 @@
 # YU_NParaxialSurface_App_V1
 
-Milestone 1.2 is a conservative first-order, prescription-driven paraxial ray
+Milestone 2.2.3.1 is a conservative first-order, prescription-driven paraxial ray
 trace app for meridional rays in the y-z plane.
 
 ## Conventions
@@ -54,10 +54,16 @@ The app includes built-in default prescriptions for:
 - Two-surface thick lens
 - Stop clipping demo
 
+Prescription editing lives directly in the Ray Diagram tab beside the element
+add/edit controls. This is the authoritative editable prescription table in
+the app. The File menu handles prescription import/export and diagnostic
+export. The optional Prescription Table tab is a guidance page, not a second
+editable copy of the prescription.
+
 The prescription table can be checked before tracing and saved or loaded as
-CSV or MAT. The MAT save helper writes a normalized table named
-`prescription`. The MAT load helper accepts either a `prescription` variable
-or a MAT file containing exactly one table.
+CSV or MAT from the File menu. The MAT save helper writes a normalized table
+named `prescription`. The MAT load helper accepts either a `prescription`
+variable or a MAT file containing exactly one table.
 
 After a trace is run, the app can export:
 
@@ -85,6 +91,9 @@ The core data helper functions are:
 - `nparaxial_field_diagnostics_yu`
 - `nparaxial_vignetting_intervals_yu`
 - `nparaxial_vignetting_summary_yu`
+- `nparaxial_matrix_chain_yu`
+- `nparaxial_matrix_chain_text_yu`
+- `nparaxial_matrix_to_text_yu`
 
 ## Ray Diagram Readability
 
@@ -98,6 +107,32 @@ styles.
 
 Milestone 2 adds first-order system diagnostics without changing the paraxial
 physics model.
+
+### Matrix Chain View
+
+The System Matrix / Image Summary tab reports the final ABCD matrix and a
+textbook-style matrix-chain view. Matrix-chain table rows are chronological:
+each row is a translation or element event encountered by a forward-propagating
+ray. The symbolic product is read right-to-left because later operations
+pre-multiply earlier state transforms:
+
+```text
+M = T(z_out - z_N) * E_N * T(z_N - z_{N-1}) * ... * E_1 * T(z_1 - z_obj)
+```
+
+Element matrices use the same conventions as the tracer:
+
+```text
+thinlens: L(f) = [1 0; -1/f 1]
+surface:  S(n1,n2,R) = [1 0; (n1-n2)/(n2*R) n1/n2]
+stop:     I = [1 0; 0 1]
+dummy:    I = [1 0; 0 1]
+```
+
+Same-plane events are ordered by increasing `z`, then `event_order`, then
+stable row order. The matrix-chain table intentionally keeps `T(0)` rows as
+same-plane separators so the displayed chain preserves and exposes this event
+ordering.
 
 ### Cardinal And Gaussian Optics
 

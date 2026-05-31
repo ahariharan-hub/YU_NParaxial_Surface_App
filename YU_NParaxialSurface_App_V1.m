@@ -34,6 +34,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         RayAxes matlab.ui.control.UIAxes
         SummaryTextArea matlab.ui.control.TextArea
+        MatrixChainTextArea matlab.ui.control.TextArea
+        FinalMatrixTextArea matlab.ui.control.TextArea
         EquationsTextArea matlab.ui.control.TextArea
         CardinalTextArea matlab.ui.control.TextArea
         PupilTextArea matlab.ui.control.TextArea
@@ -41,6 +43,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         ChiefTextArea matlab.ui.control.TextArea
         InvariantTextArea matlab.ui.control.TextArea
         MatrixTable matlab.ui.control.Table
+        MatrixChainTable matlab.ui.control.Table
         CardinalTable matlab.ui.control.Table
         PupilCandidateTable matlab.ui.control.Table
         VignettingCandidateTable matlab.ui.control.Table
@@ -55,6 +58,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         IsRunning logical = false
         IsDirty logical = true
         SelectedPrescriptionRows double = []
+        LastRefreshedTabTitle string = ""
     end
 
     methods (Access = private)
@@ -79,6 +83,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'Name', 'Y-U N Paraxial Surface App V1', ...
                 'Position', [70 70 1240 780], ...
                 'Color', [0.97 0.97 0.96]);
+            app.createMenus();
 
             app.MainGrid = uigridlayout(app.UIFigure, [1 2]);
             app.MainGrid.ColumnWidth = {290, '1x'};
@@ -198,15 +203,67 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.TabGroup.Layout.Column = 2;
 
             rayTab = uitab(app.TabGroup, 'Title', 'Ray Diagram');
-            rayGrid = uigridlayout(rayTab, [1 1]);
+            rayGrid = uigridlayout(rayTab, [2 1]);
+            rayGrid.RowHeight = {215, '1x'};
+            rayGrid.ColumnWidth = {'1x'};
             rayGrid.Padding = [8 8 8 8];
+            rayGrid.RowSpacing = 8;
+
+            rayTopGrid = uigridlayout(rayGrid, [1 2]);
+            rayTopGrid.Layout.Row = 1;
+            rayTopGrid.Layout.Column = 1;
+            rayTopGrid.ColumnWidth = {330, '1x'};
+            rayTopGrid.RowHeight = {'1x'};
+            rayTopGrid.Padding = [0 0 0 0];
+            rayTopGrid.ColumnSpacing = 8;
+
+            controlsPanel = uipanel(rayTopGrid, ...
+                'Title', 'Prescription Controls', ...
+                'FontWeight', 'bold');
+            controlsPanel.Layout.Row = 1;
+            controlsPanel.Layout.Column = 1;
+
+            app.PrescriptionButtonGrid = uigridlayout(controlsPanel, [5 2]);
+            app.PrescriptionButtonGrid.RowHeight = repmat({28}, 1, 5);
+            app.PrescriptionButtonGrid.ColumnWidth = {'1x', '1x'};
+            app.PrescriptionButtonGrid.Padding = [8 8 8 8];
+            app.PrescriptionButtonGrid.RowSpacing = 6;
+            app.PrescriptionButtonGrid.ColumnSpacing = 6;
+
+            app.addPrescriptionButton('Add Thin Lens', 1, 1, ...
+                @(~, ~) app.addPrescriptionRow("thinlens"));
+            app.addPrescriptionButton('Add Surface', 1, 2, ...
+                @(~, ~) app.addPrescriptionRow("surface"));
+            app.addPrescriptionButton('Add Stop', 2, 1, ...
+                @(~, ~) app.addPrescriptionRow("stop"));
+            app.addPrescriptionButton('Add Dummy', 2, 2, ...
+                @(~, ~) app.addPrescriptionRow("dummy"));
+            app.addPrescriptionButton('Duplicate Row', 3, 1, ...
+                @(~, ~) app.duplicatePrescriptionRow());
+            app.addPrescriptionButton('Delete Selected Row', 3, 2, ...
+                @(~, ~) app.deleteSelectedPrescriptionRows());
+            app.addPrescriptionButton('Sort Prescription', 4, 1, ...
+                @(~, ~) app.sortPrescriptionTable());
+            app.addPrescriptionButton('Check Prescription', 4, 2, ...
+                @(~, ~) app.checkPrescription());
+            app.addPrescriptionButton('Run Trace', 5, [1 2], ...
+                @(~, ~) app.runTrace());
+
+            app.PrescriptionTable = uitable(rayTopGrid);
+            app.PrescriptionTable.Layout.Row = 1;
+            app.PrescriptionTable.Layout.Column = 2;
+            app.PrescriptionTable.ColumnEditable = true(1, 10);
+            app.PrescriptionTable.CellEditCallback = @(~, ~) app.requestTrace();
+            app.PrescriptionTable.CellSelectionCallback = ...
+                @(~, event) app.selectPrescriptionRows(event);
+
             app.RayAxes = uiaxes(rayGrid);
-            app.RayAxes.Layout.Row = 1;
+            app.RayAxes.Layout.Row = 2;
             app.RayAxes.Layout.Column = 1;
 
             summaryTab = uitab(app.TabGroup, 'Title', 'System Matrix / Image Summary');
-            summaryGrid = uigridlayout(summaryTab, [2 1]);
-            summaryGrid.RowHeight = {'1x', '1x'};
+            summaryGrid = uigridlayout(summaryTab, [4 1]);
+            summaryGrid.RowHeight = {120, 135, 120, '1x'};
             summaryGrid.Padding = [8 8 8 8];
             summaryGrid.RowSpacing = 8;
 
@@ -219,9 +276,36 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.SummaryTextArea.Layout.Row = 1;
             app.SummaryTextArea.Layout.Column = 1;
 
-            app.MatrixTable = uitable(summaryGrid);
-            app.MatrixTable.Layout.Row = 2;
+            matrixOverviewGrid = uigridlayout(summaryGrid, [1 2]);
+            matrixOverviewGrid.Layout.Row = 2;
+            matrixOverviewGrid.Layout.Column = 1;
+            matrixOverviewGrid.ColumnWidth = {'1x', '1x'};
+            matrixOverviewGrid.RowHeight = {'1x'};
+            matrixOverviewGrid.Padding = [0 0 0 0];
+            matrixOverviewGrid.ColumnSpacing = 8;
+
+            app.MatrixTable = uitable(matrixOverviewGrid);
+            app.MatrixTable.Layout.Row = 1;
             app.MatrixTable.Layout.Column = 1;
+
+            app.FinalMatrixTextArea = uitextarea(matrixOverviewGrid, ...
+                'Editable', 'off', ...
+                'FontName', 'Consolas');
+            app.FinalMatrixTextArea.Layout.Row = 1;
+            app.FinalMatrixTextArea.Layout.Column = 2;
+
+            app.MatrixChainTextArea = uitextarea(summaryGrid, ...
+                'Editable', 'off', ...
+                'FontName', 'Consolas');
+            if isprop(app.MatrixChainTextArea, 'WordWrap')
+                app.MatrixChainTextArea.WordWrap = 'off';
+            end
+            app.MatrixChainTextArea.Layout.Row = 3;
+            app.MatrixChainTextArea.Layout.Column = 1;
+
+            app.MatrixChainTable = uitable(summaryGrid);
+            app.MatrixChainTable.Layout.Row = 4;
+            app.MatrixChainTable.Layout.Column = 1;
 
             cardinalTab = uitab(app.TabGroup, 'Title', 'Cardinal / Gaussian');
             cardinalGrid = uigridlayout(cardinalTab, [2 1]);
@@ -328,71 +412,108 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.EquationsTextArea.Layout.Column = 1;
 
             prescriptionTab = uitab(app.TabGroup, 'Title', 'Prescription Table');
-            prescriptionGrid = uigridlayout(prescriptionTab, [2 1]);
-            prescriptionGrid.RowHeight = {116, '1x'};
+            prescriptionGrid = uigridlayout(prescriptionTab, [1 1]);
             prescriptionGrid.ColumnWidth = {'1x'};
             prescriptionGrid.Padding = [8 8 8 8];
-            prescriptionGrid.RowSpacing = 8;
 
-            app.PrescriptionButtonGrid = uigridlayout(prescriptionGrid, [3 7]);
-            app.PrescriptionButtonGrid.Layout.Row = 1;
-            app.PrescriptionButtonGrid.Layout.Column = 1;
-            app.PrescriptionButtonGrid.ColumnWidth = repmat({'1x'}, 1, 7);
-            app.PrescriptionButtonGrid.RowHeight = {32, 32, 32};
-            app.PrescriptionButtonGrid.Padding = [0 0 0 0];
-            app.PrescriptionButtonGrid.ColumnSpacing = 6;
-            app.PrescriptionButtonGrid.RowSpacing = 6;
+            prescriptionHelp = uitextarea(prescriptionGrid, ...
+                'Editable', 'off', ...
+                'FontName', 'Consolas', ...
+                'Value', { ...
+                'Prescription editing now lives in the Ray Diagram tab.'; ...
+                ''; ...
+                'Use the controls next to the table to add, duplicate, delete,'; ...
+                'sort, check, and trace the active prescription.'; ...
+                ''; ...
+                'Use the File menu for CSV/MAT prescription import/export'; ...
+                'and diagnostic exports.'; ...
+                ''; ...
+                'There is one editable prescription table in the app, so row'; ...
+                'edits and element controls share the same dirty-state behavior.'});
+            prescriptionHelp.Layout.Row = 1;
+            prescriptionHelp.Layout.Column = 1;
+        end
 
-            app.addPrescriptionButton('Add Thin Lens', 1, 1, ...
-                @(~, ~) app.addPrescriptionRow("thinlens"));
-            app.addPrescriptionButton('Add Surface', 1, 2, ...
-                @(~, ~) app.addPrescriptionRow("surface"));
-            app.addPrescriptionButton('Add Stop', 1, 3, ...
-                @(~, ~) app.addPrescriptionRow("stop"));
-            app.addPrescriptionButton('Add Dummy', 1, 4, ...
-                @(~, ~) app.addPrescriptionRow("dummy"));
-            app.addPrescriptionButton('Duplicate Row', 1, 5, ...
-                @(~, ~) app.duplicatePrescriptionRow());
-            app.addPrescriptionButton('Delete Selected Row', 1, 6, ...
-                @(~, ~) app.deleteSelectedPrescriptionRows());
-            app.addPrescriptionButton('Sort Prescription', 1, 7, ...
-                @(~, ~) app.sortPrescriptionTable());
+        function createMenus(app)
+            fileMenu = uimenu(app.UIFigure, 'Text', 'File');
+            uimenu(fileMenu, 'Text', 'New / Reset Default Prescription', ...
+                'MenuSelectedFcn', @(~, ~) app.resetDefaults());
+            uimenu(fileMenu, 'Text', 'Load Prescription CSV', ...
+                'Separator', 'on', ...
+                'MenuSelectedFcn', @(~, ~) app.loadPrescriptionCsv());
+            uimenu(fileMenu, 'Text', 'Save Prescription CSV', ...
+                'MenuSelectedFcn', @(~, ~) app.savePrescriptionCsv());
+            uimenu(fileMenu, 'Text', 'Load Prescription MAT', ...
+                'MenuSelectedFcn', @(~, ~) app.loadPrescriptionMat());
+            uimenu(fileMenu, 'Text', 'Save Prescription MAT', ...
+                'MenuSelectedFcn', @(~, ~) app.savePrescriptionMat());
+            uimenu(fileMenu, 'Text', 'Export Ray Table CSV', ...
+                'Separator', 'on', ...
+                'MenuSelectedFcn', @(~, ~) app.exportRayTableCsv());
+            uimenu(fileMenu, 'Text', 'Export Cardinal Data CSV', ...
+                'MenuSelectedFcn', @(~, ~) app.exportCardinalDataCsv());
+            uimenu(fileMenu, 'Text', 'Export Stop/Pupil Data CSV', ...
+                'MenuSelectedFcn', @(~, ~) app.exportPupilDataCsv());
+            uimenu(fileMenu, 'Text', 'Export Chief/Marginal Rays CSV', ...
+                'MenuSelectedFcn', @(~, ~) app.exportChiefMarginalCsv());
+            uimenu(fileMenu, 'Text', 'Export Invariant/Phase-Space CSV', ...
+                'MenuSelectedFcn', @(~, ~) app.exportInvariantPhaseCsv());
+            uimenu(fileMenu, 'Text', 'Export Vignetting CSV', ...
+                'MenuSelectedFcn', @(~, ~) app.exportVignettingCsv());
+            uimenu(fileMenu, 'Text', 'Export Combined First-Order Report TXT', ...
+                'MenuSelectedFcn', @(~, ~) app.exportCombinedFirstOrderReportTxt());
 
-            app.addPrescriptionButton('Check Prescription', 2, 1, ...
-                @(~, ~) app.checkPrescription());
-            app.addPrescriptionButton('Save Prescription CSV', 2, 2, ...
-                @(~, ~) app.savePrescriptionCsv());
-            app.addPrescriptionButton('Load Prescription CSV', 2, 3, ...
-                @(~, ~) app.loadPrescriptionCsv());
-            app.addPrescriptionButton('Save Prescription MAT', 2, 4, ...
-                @(~, ~) app.savePrescriptionMat());
-            app.addPrescriptionButton('Load Prescription MAT', 2, 5, ...
-                @(~, ~) app.loadPrescriptionMat());
-            app.addPrescriptionButton('Export Ray Table CSV', 2, 6, ...
-                @(~, ~) app.exportRayTableCsv());
-            app.addPrescriptionButton('Export Summary TXT', 2, 7, ...
-                @(~, ~) app.exportSummaryTxt());
+            viewMenu = uimenu(app.UIFigure, 'Text', 'View');
+            uimenu(viewMenu, 'Text', 'Show Ray Diagram', ...
+                'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Ray Diagram"));
+            uimenu(viewMenu, 'Text', 'Show System Matrix', ...
+                'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("System Matrix / Image Summary"));
+            uimenu(viewMenu, 'Text', 'Show Cardinal / Gaussian', ...
+                'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Cardinal / Gaussian"));
+            uimenu(viewMenu, 'Text', 'Show Stops / Pupils', ...
+                'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Stops / Pupils"));
+            uimenu(viewMenu, 'Text', 'Show Vignetting', ...
+                'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Vignetting"));
+            uimenu(viewMenu, 'Text', 'Show Equations', ...
+                'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Equations"));
+            uimenu(viewMenu, 'Text', 'Refresh Current View', ...
+                'Separator', 'on', ...
+                'MenuSelectedFcn', @(~, ~) app.refreshSelectedTab());
 
-            app.addPrescriptionButton('Export Cardinal Data CSV', 3, 1, ...
-                @(~, ~) app.exportCardinalDataCsv());
-            app.addPrescriptionButton('Export Stop/Pupil Data CSV', 3, 2, ...
-                @(~, ~) app.exportPupilDataCsv());
-            app.addPrescriptionButton('Export Chief/Marginal Rays CSV', 3, 3, ...
-                @(~, ~) app.exportChiefMarginalCsv());
-            app.addPrescriptionButton('Export Invariant/Phase-Space CSV', 3, 4, ...
-                @(~, ~) app.exportInvariantPhaseCsv());
-            app.addPrescriptionButton('Export Combined First-Order Report TXT', 3, 5, ...
-                @(~, ~) app.exportCombinedFirstOrderReportTxt());
-            app.addPrescriptionButton('Export Vignetting CSV', 3, 6, ...
-                @(~, ~) app.exportVignettingCsv());
+            helpMenu = uimenu(app.UIFigure, 'Text', 'Help');
+            uimenu(helpMenu, 'Text', 'Conventions', ...
+                'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Equations"));
+            uimenu(helpMenu, 'Text', 'About N-Paraxial Surface App', ...
+                'MenuSelectedFcn', @(~, ~) app.showAbout());
+        end
 
-            app.PrescriptionTable = uitable(prescriptionGrid);
-            app.PrescriptionTable.Layout.Row = 2;
-            app.PrescriptionTable.Layout.Column = 1;
-            app.PrescriptionTable.ColumnEditable = true(1, 10);
-            app.PrescriptionTable.CellEditCallback = @(~, ~) app.requestTrace();
-            app.PrescriptionTable.CellSelectionCallback = ...
-                @(~, event) app.selectPrescriptionRows(event);
+        function selectTabByTitle(app, titleText)
+            titleText = string(titleText);
+            tabs = app.TabGroup.Children;
+            for k = 1:numel(tabs)
+                if string(tabs(k).Title) == titleText
+                    if isequal(app.TabGroup.SelectedTab, tabs(k))
+                        app.refreshSelectedTab();
+                    else
+                        app.TabGroup.SelectedTab = tabs(k);
+                        drawnow limitrate
+                        if app.LastRefreshedTabTitle ~= titleText
+                            app.refreshSelectedTab();
+                        end
+                    end
+                    return
+                end
+            end
+            app.setStatus("View tab not found: " + titleText, true);
+        end
+
+        function showAbout(app)
+            message = sprintf([ ...
+                'YU_NParaxialSurface_App_V1\n\n', ...
+                'Prescription-driven first-order y-u paraxial app.\n', ...
+                'Use the Ray Diagram tab for prescription editing and the File menu for import/export.\n', ...
+                'No exact Snell tracing, Seidel aberrations, or lithography optimization are included.']);
+            uialert(app.UIFigure, message, 'About N-Paraxial Surface App');
         end
 
         function addPrescriptionButton(app, labelText, row, column, callbackFcn)
@@ -464,10 +585,20 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   The text summary can be exported after a trace is run.'
                 '   Diagnostic tables can be exported as CSV by diagnostic tab group.'
                 '   A combined first-order diagnostics report can be exported as TXT.'
+                '   Prescription editing lives in one authoritative Ray Diagram tab table.'
+                '   The File menu handles prescription import/export and diagnostic export.'
                 '   Diagnostic field y controls chief/marginal and invariant diagnostics.'
                 '   Diagnostic field y also controls vignetting interval diagnostics.'
                 ''
-                '9. Cardinal / Gaussian diagnostics'
+                '9. System matrix chain'
+                '   The System Matrix tab displays the final ABCD matrix and a matrix chain.'
+                '   Chronological table rows propagate left-to-right through physical z.'
+                '   Symbolic multiplication is right-to-left: later matrices multiply earlier states.'
+                '   M = T(z_out-z_N)*E_N*...*E_1*T(z_1-z_obj).'
+                '   Element matrices are L(f), S(n1,n2,R), or I for stop/dummy.'
+                '   T(0) same-plane rows are retained to preserve event_order diagnostics.'
+                ''
+                '10. Cardinal / Gaussian diagnostics'
                 '   For M = [A B; C D] from z1 to z2, n1 input and n2 output:'
                 '   Delta = n1/n2'
                 '   Phi = -n2*C'
@@ -485,7 +616,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   z_N2 = z2 + (Delta - A)/C'
                 '   If abs(C) <= tol, the system is reported as afocal/zero-power.'
                 ''
-                '10. Aperture stop and pupils'
+                '11. Aperture stop and pupils'
                 '   Finite aperture candidates constrain launch slopes by:'
                 '   |A_i*y_obj + B_i*u0| <= a_i'
                 '   The axial aperture stop is the tightest finite launch-slope interval.'
@@ -494,7 +625,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   Exit pupil: x_XP = -B_post/D_post, z_XP = z_rear + x_XP.'
                 '   The selected stop is split by event identity, not by z only.'
                 ''
-                '11. Off-axis vignetting intervals'
+                '12. Off-axis vignetting intervals'
                 '   For each finite aperture, compute the allowed u0 interval.'
                 '   If abs(B_i) > tol:'
                 '   u_low_i = min((-a_i - A_i*y_obj)/B_i, (a_i - A_i*y_obj)/B_i)'
@@ -504,7 +635,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   Lower and upper cone limits may be set by different apertures.'
                 '   This is first-order meridional vignetting, not full 3D pupil analysis.'
                 ''
-                '12. Chief, marginal, and invariant diagnostics'
+                '13. Chief, marginal, and invariant diagnostics'
                 '   Chief ray targets y_stop = 0.'
                 '   Upper and lower marginal rays target +a_stop and -a_stop.'
                 '   These stop-targeted rays are distinct from vignetting interval limits.'
@@ -515,14 +646,14 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   Invariant conservation is meaningful only where invariant_valid is true.'
                 '   Event-plane invariant samples are labeled state_side = after_event.'
                 ''
-                '13. Image solve'
+                '14. Image solve'
                 '   Build M_ref = [A B; C D] from object plane to z_ref.'
                 '   z_ref is the last enabled element position.'
                 '   After translating by x: B_total = B + x*D.'
                 '   The image condition is B_total = 0, so x = -B/D.'
                 '   This milestone accepts only z_img >= z_ref.'
                 ''
-                '14. Current limitations'
+                '15. Current limitations'
                 '   Paraxial first-order model only.'
                 '   No exact Snell tracing.'
                 '   No aberration calculation.'
@@ -880,6 +1011,15 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             if ~isempty(app.MatrixTable) && isvalid(app.MatrixTable)
                 app.MatrixTable.Data = table();
             end
+            if ~isempty(app.FinalMatrixTextArea) && isvalid(app.FinalMatrixTextArea)
+                app.FinalMatrixTextArea.Value = staleText;
+            end
+            if ~isempty(app.MatrixChainTextArea) && isvalid(app.MatrixChainTextArea)
+                app.MatrixChainTextArea.Value = staleText;
+            end
+            if ~isempty(app.MatrixChainTable) && isvalid(app.MatrixChainTable)
+                app.MatrixChainTable.Data = table();
+            end
             if ~isempty(app.CardinalTextArea) && isvalid(app.CardinalTextArea)
                 app.CardinalTextArea.Value = staleText;
             end
@@ -1009,6 +1149,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             fieldTable.num_blocked = num_blocked;
 
             matrixTable = app.makeMatrixTable(img, params.z_obj);
+            matrixChain = nparaxial_matrix_chain_yu( ...
+                prescription, params.z_obj, img.z_img);
             summaryLines = app.makeSummaryLines( ...
                 params, prescription, img, primaryStop, fieldTable);
             diagnostics = app.computeFirstOrderDiagnostics( ...
@@ -1024,6 +1166,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             data.bundleSet = bundleSet;
             data.fieldTable = fieldTable;
             data.matrixTable = matrixTable;
+            data.matrixChain = matrixChain;
             data.summaryLines = summaryLines;
             data.diagnostics = diagnostics;
         end
@@ -1645,6 +1788,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
 
             titleText = string(app.TabGroup.SelectedTab.Title);
+            app.LastRefreshedTabTitle = titleText;
             switch titleText
                 case "Ray Diagram"
                     app.plotRayDiagram();
@@ -1817,6 +1961,22 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         function updateSummary(app)
             app.SummaryTextArea.Value = app.Data.summaryLines;
             app.MatrixTable.Data = app.Data.matrixTable;
+
+            if isfield(app.Data, 'matrixChain') && ~isempty(app.Data.matrixChain)
+                chain = app.Data.matrixChain;
+                app.MatrixChainTextArea.Value = cellstr( ...
+                    nparaxial_matrix_chain_text_yu(chain));
+                app.MatrixChainTable.Data = chain.steps;
+                app.FinalMatrixTextArea.Value = cellstr( ...
+                    nparaxial_matrix_to_text_yu( ...
+                    chain.final_matrix, 'Final cumulative M'));
+            else
+                app.MatrixChainTextArea.Value = { ...
+                    'Run Trace to build the matrix-chain view.'};
+                app.MatrixChainTable.Data = table();
+                app.FinalMatrixTextArea.Value = { ...
+                    'Final cumulative M unavailable.'};
+            end
         end
 
         function updateCardinalDiagnostics(app)
