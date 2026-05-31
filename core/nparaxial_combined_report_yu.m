@@ -15,7 +15,7 @@ function lines = nparaxial_combined_report_yu( ...
     lines = add_line_local(lines, "Field label: " + diagnostics.field_label);
     if isfield(diagnostics, 'off_axis_warning') && ...
             strlength(diagnostics.off_axis_warning) > 0
-        lines = add_line_local(lines, "Warning: " + diagnostics.off_axis_warning);
+        lines = add_line_local(lines, "Off-axis note: " + diagnostics.off_axis_warning);
     end
     lines = add_line_local(lines, "");
 
@@ -55,6 +55,14 @@ function lines = nparaxial_combined_report_yu( ...
         end
     end
 
+    if isfield(diagnostics, 'vignetting') && ~isempty(diagnostics.vignetting)
+        lines = append_vignetting_local(lines, diagnostics);
+    elseif isfield(diagnostics, 'vignetting_error') && ...
+            strlength(diagnostics.vignetting_error) > 0
+        lines = append_section_local(lines, "Vignetting intervals", ...
+            "Unavailable: " + diagnostics.vignetting_error);
+    end
+
     if isempty(diagnostics.chief_marginal)
         lines = append_section_local(lines, "Chief/marginal", ...
             "Unavailable: " + diagnostics.chief_error);
@@ -85,15 +93,34 @@ function lines = nparaxial_combined_report_yu( ...
         "No exact Snell tracing."
         "No Seidel aberration calculation."
         "No lithography optimization."
-        "Stop selection is axial-first-order in this milestone."
-        "Full off-axis vignetting interval analysis is not implemented in Milestone 2.2."
+        "Axial aperture stop selection remains distinct from off-axis lower/upper cone limiting apertures."
+        "Off-axis vignetting intervals are first-order meridional diagnostics, not full 3D pupil analysis."
         "r = [y;u] is not canonical when n changes; canonical p = n*u."
     ];
     if isfield(diagnostics, 'off_axis_warning') && ...
             strlength(diagnostics.off_axis_warning) > 0
-        warnings(end+1, 1) = "Off-axis warning: " + diagnostics.off_axis_warning;
+        warnings(end+1, 1) = "Off-axis note: " + diagnostics.off_axis_warning;
     end
     lines = append_section_local(lines, "Limitations/warnings", warnings);
+end
+
+
+function lines = append_vignetting_local(lines, diagnostics)
+    vig = diagnostics.vignetting;
+    if isfield(diagnostics, 'vignetting_summary') && ...
+            ~isempty(diagnostics.vignetting_summary)
+        summary = diagnostics.vignetting_summary;
+    else
+        summary = nparaxial_vignetting_summary_yu(vig);
+    end
+
+    lines = append_section_local(lines, "Vignetting intervals", ...
+        string(summary.lines(:)));
+    lines = append_table_local(lines, "Vignetting summary", summary.table);
+    lines = append_table_local(lines, "Vignetting aperture intervals", ...
+        vig.candidate_table);
+    lines = append_table_local(lines, "Vignetting cumulative interval", ...
+        vig.cumulative_table);
 end
 
 
@@ -133,7 +160,7 @@ function lines = append_selected_stop_local(lines, diagnostics)
     if isfield(diagnostics, 'off_axis_warning') && ...
             strlength(diagnostics.off_axis_warning) > 0
         lines = add_line_local(lines, ...
-            "off_axis_stop_note = Off-axis diagnostics trace rays for the selected field height, but aperture stop selection remains axial. Full off-axis vignetting interval analysis is not implemented in this milestone.");
+            "off_axis_stop_note = Stop-targeted chief/marginal rays trace the selected field height through the axial stop; vignetting intervals report the off-axis lower and upper cone limits separately.");
     end
     lines = add_line_local(lines, "");
 end

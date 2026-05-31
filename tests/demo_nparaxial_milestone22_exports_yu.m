@@ -54,8 +54,9 @@ function test_combined_report_local()
         "Chief/marginal"
         "Invariant"
         "Diagnostic field height"
+        "Vignetting intervals"
         "Limitations/warnings"
-        "Off-axis diagnostics use the selected axial stop"
+        "Off-axis vignetting interval diagnostics are first-order meridional diagnostics"
     ];
     for k = 1:numel(requiredTokens)
         assert(contains(text, requiredTokens(k)), ...
@@ -77,10 +78,12 @@ function test_field_aware_diagnostics_local()
         'Axial diagnostics should not carry off-axis warning.');
     assert(~offAxis.is_axial, 'Nonzero y_field should be labeled off-axis.');
     assert(contains(offAxis.off_axis_warning, ...
-        "Off-axis diagnostics use the selected axial stop"), ...
-        'Off-axis diagnostics should report selected axial stop warning.');
+        "Off-axis vignetting interval diagnostics are first-order meridional diagnostics"), ...
+        'Off-axis diagnostics should report first-order vignetting interval note.');
     assert(offAxis.stop.selected_event_index == axial.stop.selected_event_index, ...
         'Off-axis diagnostics should keep the axial-selected stop.');
+    assert(~isempty(offAxis.vignetting), ...
+        'Off-axis diagnostics should include vignetting intervals.');
     assert(all(offAxis.chief_marginal.rays.y0 == 4), ...
         'Chief/marginal rays should use the selected diagnostic field height.');
 end

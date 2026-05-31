@@ -21,9 +21,9 @@ function diagnostics = nparaxial_field_diagnostics_yu( ...
     isAxial = abs(y_field) <= tol;
     offAxisWarning = "";
     if ~isAxial
-        offAxisWarning = ['Off-axis diagnostics use the selected axial stop. ', ...
-            'Full off-axis vignetting interval analysis is not implemented ', ...
-            'in this milestone.'];
+        offAxisWarning = ['Off-axis vignetting interval diagnostics are ', ...
+            'first-order meridional diagnostics. Lower and upper cone ', ...
+            'limits may be set by different apertures.'];
     end
 
     diagnostics = struct();
@@ -38,12 +38,15 @@ function diagnostics = nparaxial_field_diagnostics_yu( ...
     diagnostics.pupil_error = "";
     diagnostics.chief_error = "";
     diagnostics.invariant_error = "";
+    diagnostics.vignetting_error = "";
     diagnostics.cardinal = [];
     diagnostics.stop = [];
     diagnostics.pupil = [];
     diagnostics.chief_marginal = [];
     diagnostics.invariant = [];
     diagnostics.phase_space = table();
+    diagnostics.vignetting = [];
+    diagnostics.vignetting_summary = [];
 
     if ~isAxial
         diagnostics.field_label = "off_axis_using_axial_stop";
@@ -57,12 +60,21 @@ function diagnostics = nparaxial_field_diagnostics_yu( ...
     end
 
     try
+        diagnostics.vignetting = nparaxial_vignetting_intervals_yu( ...
+            prescription, z_obj, y_field, z_img, tol);
+        diagnostics.vignetting_summary = nparaxial_vignetting_summary_yu( ...
+            diagnostics.vignetting);
+    catch ME
+        diagnostics.vignetting_error = string(ME.message);
+    end
+
+    try
         diagnostics.stop = nparaxial_select_aperture_stop_yu( ...
             prescription, z_obj, 0, tol);
         if ~isempty(diagnostics.stop) && strlength(offAxisWarning) > 0
             diagnostics.stop.off_axis_warning = string(offAxisWarning);
-            diagnostics.stop.note = diagnostics.stop.note + " " + ...
-                diagnostics.stop.off_axis_warning;
+            diagnostics.stop.note = diagnostics.stop.note + ...
+                " Aperture stop selection remains axial; see vignetting interval diagnostics for off-axis cone limits.";
         end
     catch ME
         diagnostics.stop_error = string(ME.message);

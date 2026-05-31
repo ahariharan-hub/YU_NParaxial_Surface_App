@@ -66,6 +66,7 @@ After a trace is run, the app can export:
 - A text summary containing the system/image summary and matrix table.
 - Cardinal diagnostics as CSV.
 - Stop and pupil diagnostics as CSV.
+- Vignetting interval diagnostics as CSV.
 - Chief/marginal ray diagnostics as CSV.
 - Invariant and phase-space diagnostics as CSV.
 - A combined first-order diagnostics report as TXT.
@@ -82,6 +83,8 @@ The core data helper functions are:
 - `nparaxial_export_summary_txt_yu`
 - `nparaxial_combined_report_yu`
 - `nparaxial_field_diagnostics_yu`
+- `nparaxial_vignetting_intervals_yu`
+- `nparaxial_vignetting_summary_yu`
 
 ## Ray Diagram Readability
 
@@ -140,22 +143,43 @@ Finite aperture candidates are tested using the launch-slope interval:
 ```
 
 The axial aperture stop is the finite aperture candidate with the tightest
-finite allowed launch-slope interval for `y_obj = 0`. Stop selection is
-axial-first-order in this milestone. Off-axis fields require cumulative
-vignetting interval diagnostics, which are not implemented yet.
+finite allowed launch-slope interval for `y_obj = 0`. This axial aperture
+stop remains the reference stop for stop-targeted chief and marginal rays.
 
 The app has a `Diagnostic field y` control. For `y = 0`, diagnostics are
 labeled axial. For nonzero diagnostic field height, chief/marginal and
 invariant diagnostics are computed for that object height using the selected
-axial stop, and the app/report include this warning:
+axial stop.
+
+Milestone 2.2.2 also computes first-order meridional off-axis vignetting
+intervals. For each finite aperture candidate:
 
 ```text
-Off-axis diagnostics use the selected axial stop. Full off-axis vignetting
-interval analysis is not implemented in this milestone.
+y_i = A_i*y_obj + B_i*u0
+|y_i| <= a_i
 ```
 
-Milestone 2.2 does not perform full off-axis stop re-selection or vignetting
-interval analysis.
+If `abs(B_i) > tol`:
+
+```text
+u_low_i  = min((-a_i - A_i*y_obj)/B_i, (a_i - A_i*y_obj)/B_i)
+u_high_i = max((-a_i - A_i*y_obj)/B_i, (a_i - A_i*y_obj)/B_i)
+```
+
+If `abs(B_i) <= tol`, the aperture either passes all launch slopes for that
+field height or fully blocks the field. The final unvignetted launch-slope
+interval is the intersection of all finite-aperture intervals:
+
+```text
+u_low_total  = max(all lower bounds)
+u_high_total = min(all upper bounds)
+```
+
+Lower and upper cone limits may be set by different apertures. These
+off-axis vignetting limits are not the same object as the axial aperture
+stop, and the interval-center ray is not labeled as the classical chief ray
+unless it also targets the selected stop center. This is first-order
+meridional vignetting, not full 3D pupil or field-of-view analysis.
 
 For a selected stop, the event sequence is split by event identity
 (`event_index`), not by `z` alone. This matters when multiple elements share

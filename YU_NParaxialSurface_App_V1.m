@@ -37,11 +37,14 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         EquationsTextArea matlab.ui.control.TextArea
         CardinalTextArea matlab.ui.control.TextArea
         PupilTextArea matlab.ui.control.TextArea
+        VignettingTextArea matlab.ui.control.TextArea
         ChiefTextArea matlab.ui.control.TextArea
         InvariantTextArea matlab.ui.control.TextArea
         MatrixTable matlab.ui.control.Table
         CardinalTable matlab.ui.control.Table
         PupilCandidateTable matlab.ui.control.Table
+        VignettingCandidateTable matlab.ui.control.Table
+        VignettingCumulativeTable matlab.ui.control.Table
         ChiefRayTable matlab.ui.control.Table
         ChiefEventTable matlab.ui.control.Table
         InvariantSummaryTable matlab.ui.control.Table
@@ -248,6 +251,23 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.PupilCandidateTable.Layout.Row = 2;
             app.PupilCandidateTable.Layout.Column = 1;
 
+            vignettingTab = uitab(app.TabGroup, 'Title', 'Vignetting');
+            vignettingGrid = uigridlayout(vignettingTab, [3 1]);
+            vignettingGrid.RowHeight = {150, '1x', '1x'};
+            vignettingGrid.Padding = [8 8 8 8];
+            vignettingGrid.RowSpacing = 8;
+            app.VignettingTextArea = uitextarea(vignettingGrid, ...
+                'Editable', 'off', ...
+                'FontName', 'Consolas');
+            app.VignettingTextArea.Layout.Row = 1;
+            app.VignettingTextArea.Layout.Column = 1;
+            app.VignettingCandidateTable = uitable(vignettingGrid);
+            app.VignettingCandidateTable.Layout.Row = 2;
+            app.VignettingCandidateTable.Layout.Column = 1;
+            app.VignettingCumulativeTable = uitable(vignettingGrid);
+            app.VignettingCumulativeTable.Layout.Row = 3;
+            app.VignettingCumulativeTable.Layout.Column = 1;
+
             chiefTab = uitab(app.TabGroup, 'Title', 'Chief / Marginal Rays');
             chiefGrid = uigridlayout(chiefTab, [3 1]);
             chiefGrid.RowHeight = {86, 130, '1x'};
@@ -351,6 +371,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 @(~, ~) app.exportInvariantPhaseCsv());
             app.addPrescriptionButton('Export Combined First-Order Report TXT', 3, 5, ...
                 @(~, ~) app.exportCombinedFirstOrderReportTxt());
+            app.addPrescriptionButton('Export Vignetting CSV', 3, 6, ...
+                @(~, ~) app.exportVignettingCsv());
 
             app.PrescriptionTable = uitable(prescriptionGrid);
             app.PrescriptionTable.Layout.Row = 2;
@@ -431,6 +453,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   Diagnostic tables can be exported as CSV by diagnostic tab group.'
                 '   A combined first-order diagnostics report can be exported as TXT.'
                 '   Diagnostic field y controls chief/marginal and invariant diagnostics.'
+                '   Diagnostic field y also controls vignetting interval diagnostics.'
                 ''
                 '9. Cardinal / Gaussian diagnostics'
                 '   For M = [A B; C D] from z1 to z2, n1 input and n2 output:'
@@ -454,16 +477,25 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   Finite aperture candidates constrain launch slopes by:'
                 '   |A_i*y_obj + B_i*u0| <= a_i'
                 '   The axial aperture stop is the tightest finite launch-slope interval.'
-                '   Stop selection is axial-first-order in this milestone.'
-                '   Off-axis fields require vignetting interval diagnostics not implemented yet.'
-                '   Off-axis diagnostics use the selected axial stop and report a warning.'
+                '   Stop-targeted chief/marginal rays still use the selected axial stop.'
                 '   Entrance pupil: z_EP = z_front + B_pre/A_pre, r_EP = a_stop/|A_pre|.'
                 '   Exit pupil: x_XP = -B_post/D_post, z_XP = z_rear + x_XP.'
                 '   The selected stop is split by event identity, not by z only.'
                 ''
-                '11. Chief, marginal, and invariant diagnostics'
+                '11. Off-axis vignetting intervals'
+                '   For each finite aperture, compute the allowed u0 interval.'
+                '   If abs(B_i) > tol:'
+                '   u_low_i = min((-a_i - A_i*y_obj)/B_i, (a_i - A_i*y_obj)/B_i)'
+                '   u_high_i = max((-a_i - A_i*y_obj)/B_i, (a_i - A_i*y_obj)/B_i)'
+                '   If abs(B_i) <= tol, the interval is all slopes or empty.'
+                '   The final unvignetted cone is the intersection of all intervals.'
+                '   Lower and upper cone limits may be set by different apertures.'
+                '   This is first-order meridional vignetting, not full 3D pupil analysis.'
+                ''
+                '12. Chief, marginal, and invariant diagnostics'
                 '   Chief ray targets y_stop = 0.'
                 '   Upper and lower marginal rays target +a_stop and -a_stop.'
+                '   These stop-targeted rays are distinct from vignetting interval limits.'
                 '   r = [y;u] is not canonical when n changes.'
                 '   Canonical momentum coordinate: p = n*u.'
                 '   Lagrange invariant: H = n*(y1*u2 - y2*u1).'
@@ -471,18 +503,19 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   Invariant conservation is meaningful only where invariant_valid is true.'
                 '   Event-plane invariant samples are labeled state_side = after_event.'
                 ''
-                '12. Image solve'
+                '13. Image solve'
                 '   Build M_ref = [A B; C D] from object plane to z_ref.'
                 '   z_ref is the last enabled element position.'
                 '   After translating by x: B_total = B + x*D.'
                 '   The image condition is B_total = 0, so x = -B/D.'
                 '   This milestone accepts only z_img >= z_ref.'
                 ''
-                '13. Current limitations'
+                '14. Current limitations'
                 '   Paraxial first-order model only.'
                 '   No exact Snell tracing.'
                 '   No aberration calculation.'
                 '   No advanced pupil diagnostics.'
+                '   No full 3D pupil or field-of-view analysis.'
                 '   No support yet for final image planes before the last enabled element.'
             };
         end
@@ -718,6 +751,21 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
         end
 
+        function exportVignettingCsv(app)
+            try
+                if ~app.hasTraceData("Run Trace before exporting vignetting data.")
+                    return
+                end
+                app.exportTableCsvWithDialog( ...
+                    app.makeVignettingExportTable(), ...
+                    'nparaxial_vignetting.csv', ...
+                    'Export Vignetting CSV', ...
+                    'Exported vignetting CSV');
+            catch ME
+                app.setStatus("Export vignetting error: " + string(ME.message), true);
+            end
+        end
+
         function exportCombinedFirstOrderReportTxt(app)
             try
                 if ~app.hasTraceData("Run Trace before exporting the first-order report.")
@@ -831,6 +879,15 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
             if ~isempty(app.PupilCandidateTable) && isvalid(app.PupilCandidateTable)
                 app.PupilCandidateTable.Data = table();
+            end
+            if ~isempty(app.VignettingTextArea) && isvalid(app.VignettingTextArea)
+                app.VignettingTextArea.Value = staleText;
+            end
+            if ~isempty(app.VignettingCandidateTable) && isvalid(app.VignettingCandidateTable)
+                app.VignettingCandidateTable.Data = table();
+            end
+            if ~isempty(app.VignettingCumulativeTable) && isvalid(app.VignettingCumulativeTable)
+                app.VignettingCumulativeTable.Data = table();
             end
             if ~isempty(app.ChiefTextArea) && isvalid(app.ChiefTextArea)
                 app.ChiefTextArea.Value = staleText;
@@ -1347,6 +1404,27 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
         end
 
+        function T = makeVignettingExportTable(app)
+            diag = app.Data.diagnostics;
+            if ~isfield(diag, 'vignetting') || isempty(diag.vignetting)
+                error('Vignetting diagnostics are unavailable.');
+            end
+            vig = diag.vignetting;
+            if isfield(diag, 'vignetting_summary') && ...
+                    ~isempty(diag.vignetting_summary)
+                summary = diag.vignetting_summary;
+            else
+                summary = nparaxial_vignetting_summary_yu(vig);
+            end
+
+            T = app.flattenTableForExport( ...
+                summary.table, "vignetting_summary");
+            T = [T; app.flattenTableForExport( ...
+                vig.candidate_table, "vignetting_candidates")];
+            T = [T; app.flattenTableForExport( ...
+                vig.cumulative_table, "vignetting_cumulative")];
+        end
+
         function T = flattenTableForExport(app, sourceTable, sectionName)
             section = strings(0, 1);
             item = strings(0, 1);
@@ -1564,6 +1642,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     app.updateCardinalDiagnostics();
                 case "Stops / Pupils"
                     app.updatePupilDiagnostics();
+                case "Vignetting"
+                    app.updateVignettingDiagnostics();
                 case "Chief / Marginal Rays"
                     app.updateChiefMarginalDiagnostics();
                 case "Invariant / Phase Space"
@@ -1807,6 +1887,37 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
             app.PupilTextArea.Value = lines;
             app.PupilCandidateTable.Data = stopDiag.candidate_table;
+        end
+
+        function updateVignettingDiagnostics(app)
+            diag = app.Data.diagnostics;
+            if ~isfield(diag, 'vignetting') || isempty(diag.vignetting) || ...
+                    strlength(diag.vignetting_error) > 0
+                app.VignettingTextArea.Value = { ...
+                    'Vignetting interval diagnostics'
+                    '--------------------------------'
+                    sprintf('Diagnostic field height y = %.6g', diag.diagnostic_field_y)
+                    char("Vignetting diagnostics unavailable: " + ...
+                    diag.vignetting_error)
+                    };
+                app.VignettingCandidateTable.Data = table();
+                app.VignettingCumulativeTable.Data = table();
+                return
+            end
+
+            summary = diag.vignetting_summary;
+            lines = string(summary.lines(:));
+            if diag.is_axial
+                lines(end+1, 1) = "Diagnostic field is axial.";
+            else
+                lines(end+1, 1) = string(diag.off_axis_warning);
+            end
+            lines(end+1, 1) = ...
+                "Stop-targeted chief/marginal rays remain separate from vignetting interval limits.";
+
+            app.VignettingTextArea.Value = cellstr(lines);
+            app.VignettingCandidateTable.Data = diag.vignetting.candidate_table;
+            app.VignettingCumulativeTable.Data = diag.vignetting.cumulative_table;
         end
 
         function updateChiefMarginalDiagnostics(app)
