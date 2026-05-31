@@ -1,12 +1,15 @@
 # YU_NParaxialSurface_App_V1
 
-Milestone 2.2.3.1 is a conservative first-order, prescription-driven paraxial ray
+Milestone 2.3.1 is a conservative first-order, prescription-driven paraxial ray
 trace app for meridional rays in the y-z plane.
 
 ## Conventions
 
 - Forward propagation is along increasing `z`.
-- Ray vector is `r = [y; u]`, with `u = dy/dz`.
+- Ray vector is `r = [y; u]`, where `u` is the paraxial ray angle in
+  radians. In this first-order model, `u` is also the small-angle slope
+  coordinate; the app does not reinterpret `u` through `atan(u)` or apply
+  any exact-angle correction.
 - Surface radius convention:
   - `R > 0`: center of curvature is at larger `z` than the surface vertex.
   - `R < 0`: center of curvature is at smaller `z`.
@@ -91,6 +94,8 @@ The core data helper functions are:
 - `nparaxial_field_diagnostics_yu`
 - `nparaxial_vignetting_intervals_yu`
 - `nparaxial_vignetting_summary_yu`
+- `nparaxial_make_manual_fan_rays_yu`
+- `nparaxial_make_aperture_limited_rays_yu`
 - `nparaxial_matrix_chain_yu`
 - `nparaxial_matrix_chain_text_yu`
 - `nparaxial_matrix_to_text_yu`
@@ -102,6 +107,25 @@ ray is green. Blocked rays are drawn with dashed segments and an `x` marker at
 the blocking element plane. Element planes are labeled by element ID and type;
 thin lenses, refracting surfaces, stops, and dummy planes use distinct line
 styles.
+
+## Ray Fan Sampling
+
+The Ray Diagram tab has a ray fan mode control:
+
+- Manual fixed-angle fan: an educational visualization fan using
+  `u0 = linspace(-u_max, +u_max, nRays)`.
+- Aperture-limited admitted cone: launch angles are sampled from the final
+  first-order vignetting interval computed by `nparaxial_vignetting_intervals_yu`.
+
+The aperture-limited fan means geometrically transmitted by the finite
+apertures in the prescription. It does not mean the ray is paraxial-valid.
+Paraxial-validity quantities such as `tan(u)-u`, `sin(u)-u`, and exact scalar
+Snell comparisons are intentionally deferred to the next diagnostics milestone.
+
+If the selected field is fully vignetted, the app does not generate an invalid
+`linspace` and reports that no transmitted aperture-limited ray fan exists. If
+the admitted interval is unbounded or semi-infinite, the app falls back to the
+manual fixed-angle range and reports that fallback.
 
 ## First-Order Diagnostics
 
@@ -283,6 +307,7 @@ after-event slope and medium index.
 
 - Paraxial first-order model only.
 - Meridional y-z plane only.
+- No paraxial-validity penalty diagnostics yet.
 - No exact Snell tracing.
 - No aberration calculation.
 - No Seidel aberration diagnostics.

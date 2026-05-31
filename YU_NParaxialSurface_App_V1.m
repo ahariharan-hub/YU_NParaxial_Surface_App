@@ -30,7 +30,9 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         FieldCountField matlab.ui.control.NumericEditField
         RayCountField matlab.ui.control.NumericEditField
         DiagnosticFieldField matlab.ui.control.NumericEditField
+        ManualUMaxField matlab.ui.control.NumericEditField
         PresetDropdown matlab.ui.control.DropDown
+        RayFanModeDropdown matlab.ui.control.DropDown
 
         RayAxes matlab.ui.control.UIAxes
         SummaryTextArea matlab.ui.control.TextArea
@@ -173,7 +175,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'Text', ['Prescription type values: thinlens, surface, stop, dummy. ', ...
                 'A finite aperture_radius clips rays at any enabled element. ', ...
                 'Only surface elements may change n_before to n_after. ', ...
-                'The first enabled finite stop is used to generate sampled ray bundles.'], ...
+                'Ray fan mode selects manual fixed-angle or aperture-limited admitted-cone sampling.'], ...
                 'WordWrap', 'on', ...
                 'FontColor', [0.25 0.25 0.25]);
             note.Layout.Row = 8;
@@ -204,7 +206,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
             rayTab = uitab(app.TabGroup, 'Title', 'Ray Diagram');
             rayGrid = uigridlayout(rayTab, [2 1]);
-            rayGrid.RowHeight = {215, '1x'};
+            rayGrid.RowHeight = {270, '1x'};
             rayGrid.ColumnWidth = {'1x'};
             rayGrid.Padding = [8 8 8 8];
             rayGrid.RowSpacing = 8;
@@ -218,35 +220,61 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             rayTopGrid.ColumnSpacing = 8;
 
             controlsPanel = uipanel(rayTopGrid, ...
-                'Title', 'Prescription Controls', ...
+                'Title', 'Ray Fan / Prescription Controls', ...
                 'FontWeight', 'bold');
             controlsPanel.Layout.Row = 1;
             controlsPanel.Layout.Column = 1;
 
-            app.PrescriptionButtonGrid = uigridlayout(controlsPanel, [5 2]);
-            app.PrescriptionButtonGrid.RowHeight = repmat({28}, 1, 5);
+            app.PrescriptionButtonGrid = uigridlayout(controlsPanel, [7 2]);
+            app.PrescriptionButtonGrid.RowHeight = {24, 24, 28, 28, 28, 28, 30};
             app.PrescriptionButtonGrid.ColumnWidth = {'1x', '1x'};
             app.PrescriptionButtonGrid.Padding = [8 8 8 8];
-            app.PrescriptionButtonGrid.RowSpacing = 6;
+            app.PrescriptionButtonGrid.RowSpacing = 5;
             app.PrescriptionButtonGrid.ColumnSpacing = 6;
 
-            app.addPrescriptionButton('Add Thin Lens', 1, 1, ...
+            rayFanLabel = uilabel(app.PrescriptionButtonGrid, ...
+                'Text', 'Ray fan mode', ...
+                'HorizontalAlignment', 'left');
+            rayFanLabel.Layout.Row = 1;
+            rayFanLabel.Layout.Column = 1;
+            app.RayFanModeDropdown = uidropdown(app.PrescriptionButtonGrid, ...
+                'Items', {'Manual fixed-angle fan', ...
+                'Aperture-limited admitted cone'}, ...
+                'Value', 'Manual fixed-angle fan', ...
+                'ValueChangedFcn', @(~, ~) app.requestTrace());
+            app.RayFanModeDropdown.Layout.Row = 1;
+            app.RayFanModeDropdown.Layout.Column = 2;
+
+            manualUMaxLabel = uilabel(app.PrescriptionButtonGrid, ...
+                'Text', 'Manual u max', ...
+                'HorizontalAlignment', 'left');
+            manualUMaxLabel.Layout.Row = 2;
+            manualUMaxLabel.Layout.Column = 1;
+            app.ManualUMaxField = uieditfield(app.PrescriptionButtonGrid, ...
+                'numeric', ...
+                'Value', 0.04, ...
+                'Limits', [eps Inf], ...
+                'ValueChangedFcn', @(~, ~) app.requestTrace());
+            app.ManualUMaxField.Layout.Row = 2;
+            app.ManualUMaxField.Layout.Column = 2;
+
+            app.addPrescriptionButton('Add Thin Lens', 3, 1, ...
                 @(~, ~) app.addPrescriptionRow("thinlens"));
-            app.addPrescriptionButton('Add Surface', 1, 2, ...
+            app.addPrescriptionButton('Add Surface', 3, 2, ...
                 @(~, ~) app.addPrescriptionRow("surface"));
-            app.addPrescriptionButton('Add Stop', 2, 1, ...
+            app.addPrescriptionButton('Add Stop', 4, 1, ...
                 @(~, ~) app.addPrescriptionRow("stop"));
-            app.addPrescriptionButton('Add Dummy', 2, 2, ...
+            app.addPrescriptionButton('Add Dummy', 4, 2, ...
                 @(~, ~) app.addPrescriptionRow("dummy"));
-            app.addPrescriptionButton('Duplicate Row', 3, 1, ...
+            app.addPrescriptionButton('Duplicate Row', 5, 1, ...
                 @(~, ~) app.duplicatePrescriptionRow());
-            app.addPrescriptionButton('Delete Selected Row', 3, 2, ...
+            app.addPrescriptionButton('Delete Selected Row', 5, 2, ...
                 @(~, ~) app.deleteSelectedPrescriptionRows());
-            app.addPrescriptionButton('Sort Prescription', 4, 1, ...
+            app.addPrescriptionButton('Sort Prescription', 6, 1, ...
                 @(~, ~) app.sortPrescriptionTable());
-            app.addPrescriptionButton('Check Prescription', 4, 2, ...
+            app.addPrescriptionButton('Check Prescription', 6, 2, ...
                 @(~, ~) app.checkPrescription());
-            app.addPrescriptionButton('Run Trace', 5, [1 2], ...
+            app.addPrescriptionButton('Run Trace', 7, [1 2], ...
                 @(~, ~) app.runTrace());
 
             app.PrescriptionTable = uitable(rayTopGrid);
@@ -547,7 +575,9 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 ''
                 '1. Direction and ray vector'
                 '   Forward propagation is along increasing z.'
-                '   Ray vector: r = [y; u], where u = dy/dz.'
+                '   Ray vector: r = [y; u], where u is the paraxial ray angle in radians.'
+                '   In this first-order model u is the small-angle slope coordinate;'
+                '   no atan/tan reinterpretation or paraxial-validity correction is applied.'
                 '   This app traces meridional rays in the y-z plane only.'
                 ''
                 '2. Surface-radius convention'
@@ -589,6 +619,13 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   The File menu handles prescription import/export and diagnostic export.'
                 '   Diagnostic field y controls chief/marginal and invariant diagnostics.'
                 '   Diagnostic field y also controls vignetting interval diagnostics.'
+                '   Ray fan mode controls plotted ray sampling in the Ray Diagram tab.'
+                '   Manual fixed-angle fan: u0 = linspace(-u_max, +u_max, nRays).'
+                '   Aperture-limited admitted cone: u0 samples the final vignetting interval.'
+                '   If the selected field is fully vignetted, no invalid fan is generated.'
+                '   If the interval is unbounded, the app falls back to the manual fan.'
+                '   Aperture-limited means geometrically admitted, not paraxial-valid.'
+                '   Paraxial-validity diagnostics are deferred to a later milestone.'
                 ''
                 '9. System matrix chain'
                 '   The System Matrix tab displays the final ABCD matrix and a matrix chain.'
@@ -656,6 +693,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '15. Current limitations'
                 '   Paraxial first-order model only.'
                 '   No exact Snell tracing.'
+                '   No paraxial-validity penalty diagnostics yet.'
                 '   No aberration calculation.'
                 '   No advanced pupil diagnostics.'
                 '   No full 3D pupil or field-of-view analysis.'
@@ -670,6 +708,12 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.FieldCountField.Value = 5;
             app.RayCountField.Value = 9;
             app.DiagnosticFieldField.Value = 0;
+            if ~isempty(app.RayFanModeDropdown) && isvalid(app.RayFanModeDropdown)
+                app.RayFanModeDropdown.Value = 'Manual fixed-angle fan';
+            end
+            if ~isempty(app.ManualUMaxField) && isvalid(app.ManualUMaxField)
+                app.ManualUMaxField.Value = 0.04;
+            end
             if ~isempty(app.PresetDropdown) && isvalid(app.PresetDropdown)
                 app.PresetDropdown.Value = 'Two thin lenses';
             end
@@ -969,7 +1013,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 app.IsDirty = false;
                 app.PrescriptionTable.Data = data.prescription;
                 app.refreshSelectedTab();
-                app.setStatus("Trace complete.", false);
+                app.setStatus(app.traceStatusMessage(data), false);
             catch ME
                 app.IsDirty = true;
                 app.clearResults();
@@ -979,6 +1023,23 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function finishTrace(app)
             app.IsRunning = false;
+        end
+
+        function message = traceStatusMessage(~, data)
+            message = "Trace complete.";
+            if ~isfield(data, 'fieldTable') || isempty(data.fieldTable)
+                return
+            end
+            T = data.fieldTable;
+            if ismember('ray_fan_fully_vignetted', T.Properties.VariableNames) && ...
+                    any(T.ray_fan_fully_vignetted)
+                message = "Selected field is fully vignetted; no transmitted aperture-limited ray fan.";
+                return
+            end
+            if ismember('ray_fan_fallback_used', T.Properties.VariableNames) && ...
+                    any(T.ray_fan_fallback_used)
+                message = "Trace complete. Aperture-limited interval is unbounded; using manual fixed-angle fan.";
+            end
         end
 
         function requestTrace(app)
@@ -1069,6 +1130,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             params.Nfield = round(app.FieldCountField.Value);
             params.Nrays = round(app.RayCountField.Value);
             params.y_diag = app.DiagnosticFieldField.Value;
+            params.ray_fan_mode = string(app.RayFanModeDropdown.Value);
+            params.manual_u_max = app.ManualUMaxField.Value;
 
             if ~isfinite(params.z_obj)
                 error('Object plane z must be finite.');
@@ -1078,6 +1141,9 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
             if ~isfinite(params.y_diag)
                 error('Diagnostic field height must be finite.');
+            end
+            if ~isfinite(params.manual_u_max) || params.manual_u_max <= 0
+                error('Manual u max must be a positive finite value.');
             end
             if params.Nfield < 1
                 error('Field count must be at least 1.');
@@ -1105,19 +1171,27 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             rms_ray_spread = NaN(numel(yFields), 1);
             num_passed = zeros(numel(yFields), 1);
             num_blocked = zeros(numel(yFields), 1);
+            ray_fan_mode = strings(numel(yFields), 1);
+            ray_fan_status = strings(numel(yFields), 1);
+            ray_fan_u_low = NaN(numel(yFields), 1);
+            ray_fan_u_high = NaN(numel(yFields), 1);
+            ray_fan_fallback_used = false(numel(yFields), 1);
+            ray_fan_fully_vignetted = false(numel(yFields), 1);
+            ray_fan_lower_limiter = strings(numel(yFields), 1);
+            ray_fan_upper_limiter = strings(numel(yFields), 1);
 
             for q = 1:numel(yFields)
                 yObj = yFields(q);
-                if ~isempty(primaryStop)
-                    rays = nparaxial_make_stop_sampled_rays_yu( ...
-                        prescription, params.z_obj, yObj, ...
-                        primaryStop.z, primaryStop.aperture_radius, params.Nrays);
+                [rays, fanInfo] = app.makeRayFan( ...
+                    params, prescription, img, yObj);
+                if height(rays) > 0
+                    rays.name = "field_" + string(q) + "_" + rays.name;
+                    rays.ray_name = rays.name;
+                    bundle = nparaxial_trace_bundle_yu( ...
+                        rays, prescription, img.z_img);
                 else
-                    rays = app.makeFanRays(params.z_obj, yObj, params.Nrays);
+                    bundle = app.emptyTraceBundle();
                 end
-                rays.name = "field_" + string(q) + "_" + rays.name;
-
-                bundle = nparaxial_trace_bundle_yu(rays, prescription, img.z_img);
                 diag = app.imageDiagnostics(bundle);
 
                 bundleSet(q).field_index = q;
@@ -1125,6 +1199,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 bundleSet(q).rays = rays;
                 bundleSet(q).bundle = bundle;
                 bundleSet(q).diag = diag;
+                bundleSet(q).ray_fan_info = fanInfo;
 
                 field_index(q) = q;
                 y_object(q) = yObj;
@@ -1135,6 +1210,14 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 rms_ray_spread(q) = diag.rms_delta_yf;
                 num_passed(q) = sum(diag.table.traced);
                 num_blocked(q) = sum(~diag.table.traced);
+                ray_fan_mode(q) = fanInfo.sampling_mode;
+                ray_fan_status(q) = fanInfo.status_text;
+                ray_fan_u_low(q) = fanInfo.used_u_low;
+                ray_fan_u_high(q) = fanInfo.used_u_high;
+                ray_fan_fallback_used(q) = fanInfo.fallback_used;
+                ray_fan_fully_vignetted(q) = fanInfo.fully_vignetted;
+                ray_fan_lower_limiter(q) = fanInfo.lower_limiter_element_id;
+                ray_fan_upper_limiter(q) = fanInfo.upper_limiter_element_id;
             end
 
             fieldTable = table;
@@ -1147,6 +1230,14 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             fieldTable.rms_ray_spread = rms_ray_spread;
             fieldTable.num_passed = num_passed;
             fieldTable.num_blocked = num_blocked;
+            fieldTable.ray_fan_mode = ray_fan_mode;
+            fieldTable.ray_fan_status = ray_fan_status;
+            fieldTable.ray_fan_u_low = ray_fan_u_low;
+            fieldTable.ray_fan_u_high = ray_fan_u_high;
+            fieldTable.ray_fan_fallback_used = ray_fan_fallback_used;
+            fieldTable.ray_fan_fully_vignetted = ray_fan_fully_vignetted;
+            fieldTable.ray_fan_lower_limiter = ray_fan_lower_limiter;
+            fieldTable.ray_fan_upper_limiter = ray_fan_upper_limiter;
 
             matrixTable = app.makeMatrixTable(img, params.z_obj);
             matrixChain = nparaxial_matrix_chain_yu( ...
@@ -1165,6 +1256,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             data.primaryStop = primaryStop;
             data.bundleSet = bundleSet;
             data.fieldTable = fieldTable;
+            data.rayFanLabel = params.ray_fan_mode;
             data.matrixTable = matrixTable;
             data.matrixChain = matrixChain;
             data.summaryLines = summaryLines;
@@ -1362,21 +1454,28 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
         end
 
-        function rays = makeFanRays(~, zObj, yObj, nRays)
-            slopes = linspace(-0.04, 0.04, nRays).';
-            names = "ray_" + string((1:nRays).');
-            mid = (nRays + 1)/2;
-            names(1) = "lower_marginal";
-            names(mid) = "chief";
-            names(end) = "upper_marginal";
+        function [rays, fanInfo] = makeRayFan(~, params, prescription, img, yObj)
+            switch string(params.ray_fan_mode)
+                case "Aperture-limited admitted cone"
+                    rays = nparaxial_make_aperture_limited_rays_yu( ...
+                        prescription, params.z_obj, yObj, params.Nrays, ...
+                        params.manual_u_max, 1e-12, img.z_img);
+                otherwise
+                    rays = nparaxial_make_manual_fan_rays_yu( ...
+                        params.z_obj, yObj, params.Nrays, ...
+                        params.manual_u_max);
+            end
+            fanInfo = rays.Properties.UserData;
+        end
 
-            rays = table;
-            rays.name = names;
-            rays.z0 = repmat(zObj, nRays, 1);
-            rays.y0 = repmat(yObj, nRays, 1);
-            rays.u0 = slopes;
-            rays.z_target = NaN(nRays, 1);
-            rays.y_target = NaN(nRays, 1);
+        function bundle = emptyTraceBundle(~)
+            bundle = struct( ...
+                'name', {}, ...
+                'ray_in', {}, ...
+                'res', {}, ...
+                'trc', {}, ...
+                'yf', {}, ...
+                'uf', {});
         end
 
         function diag = imageDiagnostics(~, bundle)
@@ -1753,13 +1852,30 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 sprintf('B residual at image = %.3e', img.B_residual)
                 sprintf('Field heights = %.6g to %.6g', min(fieldTable.y_object), max(fieldTable.y_object))
                 sprintf('Fields = %d, rays per field = %d', params.Nfield, params.Nrays)
+                sprintf('Ray fan mode = %s', params.ray_fan_mode)
+                sprintf('Manual fixed-angle u max = %.6g rad', params.manual_u_max)
                 sprintf('Passed rays = %d, blocked rays = %d', totalPassed, totalBlocked)
                 sprintf('Max image error = %.3e', maxAbsError)
                 sprintf('Max ray spread = %.3e', maxSpread)
                 ''
-                'Element sequence'
+                'Ray fan sampling'
                 '----------------'
             };
+
+            for q = 1:height(fieldTable)
+                lines{end+1, 1} = sprintf( ...
+                    'field %d y=%.6g: %s, u=[%.6g, %.6g], fallback=%d, fully_vignetted=%d', ...
+                    fieldTable.field_index(q), fieldTable.y_object(q), ...
+                    fieldTable.ray_fan_status(q), fieldTable.ray_fan_u_low(q), ...
+                    fieldTable.ray_fan_u_high(q), fieldTable.ray_fan_fallback_used(q), ...
+                    fieldTable.ray_fan_fully_vignetted(q)); %#ok<AGROW>
+            end
+
+            lines = [lines; {
+                ''
+                'Element sequence'
+                '----------------'
+                }];
 
             for k = 1:height(elements)
                 lines{end+1, 1} = sprintf( ...
@@ -1772,11 +1888,11 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
             if isempty(primaryStop)
                 lines{end+1, 1} = '';
-                lines{end+1, 1} = 'Ray generation used a simple launch-angle fan because no finite stop was available.';
+                lines{end+1, 1} = 'No finite standalone stop was selected for stop-targeted diagnostics.';
             else
                 lines{end+1, 1} = '';
                 lines{end+1, 1} = sprintf( ...
-                    'Ray generation targeted stop "%s" at z = %.6g, radius = %.6g.', ...
+                    'First finite standalone stop is "%s" at z = %.6g, radius = %.6g.', ...
                     primaryStop.element_id(1), primaryStop.z(1), ...
                     primaryStop.aperture_radius(1));
             end
@@ -1890,7 +2006,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
             xlabel(ax, 'z');
             ylabel(ax, 'y');
-            title(ax, 'N-element paraxial ray trace');
+            title(ax, "N-element paraxial ray trace - " + data.rayFanLabel);
             hold(ax, 'off');
         end
 

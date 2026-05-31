@@ -90,6 +90,8 @@ function lines = nparaxial_combined_report_yu( ...
         "----------------------"
         "Paraxial first-order model only."
         "Meridional y-z plane only."
+        "Aperture-limited fan rays are geometrically admitted, not paraxial-validity certified."
+        "No paraxial-validity penalty diagnostics yet."
         "No exact Snell tracing."
         "No Seidel aberration calculation."
         "No lithography optimization."

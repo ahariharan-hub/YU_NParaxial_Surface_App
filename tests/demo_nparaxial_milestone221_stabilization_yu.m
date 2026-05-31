@@ -124,11 +124,8 @@ function status = test_app_dirty_state_smoke_local(rootFolder)
     cleanupApp = onCleanup(@() delete(app)); %#ok<NASGU>
     app.UIFigure.Visible = 'off';
 
-    presetDropdown = findall(app.UIFigure, ...
-        '-isa', 'matlab.ui.control.DropDown');
-    assert(~isempty(presetDropdown), ...
-        'App smoke test could not find default prescription dropdown.');
-    presetDropdown(1).Value = 'Single thin lens';
+    presetDropdown = find_dropdown_with_item_local(app.UIFigure, 'Single thin lens');
+    presetDropdown.Value = 'Single thin lens';
 
     loadButton = findall(app.UIFigure, ...
         '-isa', 'matlab.ui.control.Button', 'Text', 'Load Default');
@@ -188,6 +185,18 @@ function assert_status_contains_local(app, token)
     end
     assert(any(contains(texts, token)), ...
         'App status did not contain "%s".', token);
+end
+
+
+function dropdown = find_dropdown_with_item_local(fig, itemText)
+    dropdowns = findall(fig, '-isa', 'matlab.ui.control.DropDown');
+    for k = 1:numel(dropdowns)
+        if any(string(dropdowns(k).Items) == string(itemText))
+            dropdown = dropdowns(k);
+            return
+        end
+    end
+    error('Could not find dropdown containing item "%s".', itemText);
 end
 
 
