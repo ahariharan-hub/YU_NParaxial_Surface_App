@@ -29,12 +29,23 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         FieldMaxField matlab.ui.control.NumericEditField
         FieldCountField matlab.ui.control.NumericEditField
         RayCountField matlab.ui.control.NumericEditField
+        DiagnosticFieldField matlab.ui.control.NumericEditField
         PresetDropdown matlab.ui.control.DropDown
 
         RayAxes matlab.ui.control.UIAxes
         SummaryTextArea matlab.ui.control.TextArea
         EquationsTextArea matlab.ui.control.TextArea
+        CardinalTextArea matlab.ui.control.TextArea
+        PupilTextArea matlab.ui.control.TextArea
+        ChiefTextArea matlab.ui.control.TextArea
+        InvariantTextArea matlab.ui.control.TextArea
         MatrixTable matlab.ui.control.Table
+        CardinalTable matlab.ui.control.Table
+        PupilCandidateTable matlab.ui.control.Table
+        ChiefRayTable matlab.ui.control.Table
+        ChiefEventTable matlab.ui.control.Table
+        InvariantSummaryTable matlab.ui.control.Table
+        PhaseSpaceTable matlab.ui.control.Table
         PrescriptionTable matlab.ui.control.Table
 
         Data struct
@@ -146,6 +157,9 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.RayCountField.Limits = [3 Inf];
             app.RayCountField.RoundFractionalValues = 'on';
 
+            app.addControlLabel('Diagnostic field y', 7);
+            app.DiagnosticFieldField = app.addNumericField(7, 0);
+
             note = uilabel(app.ControlGrid, ...
                 'Text', ['Prescription type values: thinlens, surface, stop, dummy. ', ...
                 'A finite aperture_radius clips rays at any enabled element. ', ...
@@ -204,6 +218,68 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.MatrixTable.Layout.Row = 2;
             app.MatrixTable.Layout.Column = 1;
 
+            cardinalTab = uitab(app.TabGroup, 'Title', 'Cardinal / Gaussian');
+            cardinalGrid = uigridlayout(cardinalTab, [2 1]);
+            cardinalGrid.RowHeight = {150, '1x'};
+            cardinalGrid.Padding = [8 8 8 8];
+            cardinalGrid.RowSpacing = 8;
+            app.CardinalTextArea = uitextarea(cardinalGrid, ...
+                'Editable', 'off', ...
+                'FontName', 'Consolas');
+            app.CardinalTextArea.Layout.Row = 1;
+            app.CardinalTextArea.Layout.Column = 1;
+            app.CardinalTable = uitable(cardinalGrid);
+            app.CardinalTable.Layout.Row = 2;
+            app.CardinalTable.Layout.Column = 1;
+
+            pupilTab = uitab(app.TabGroup, 'Title', 'Stops / Pupils');
+            pupilGrid = uigridlayout(pupilTab, [2 1]);
+            pupilGrid.RowHeight = {170, '1x'};
+            pupilGrid.Padding = [8 8 8 8];
+            pupilGrid.RowSpacing = 8;
+            app.PupilTextArea = uitextarea(pupilGrid, ...
+                'Editable', 'off', ...
+                'FontName', 'Consolas');
+            app.PupilTextArea.Layout.Row = 1;
+            app.PupilTextArea.Layout.Column = 1;
+            app.PupilCandidateTable = uitable(pupilGrid);
+            app.PupilCandidateTable.Layout.Row = 2;
+            app.PupilCandidateTable.Layout.Column = 1;
+
+            chiefTab = uitab(app.TabGroup, 'Title', 'Chief / Marginal Rays');
+            chiefGrid = uigridlayout(chiefTab, [3 1]);
+            chiefGrid.RowHeight = {86, 130, '1x'};
+            chiefGrid.Padding = [8 8 8 8];
+            chiefGrid.RowSpacing = 8;
+            app.ChiefTextArea = uitextarea(chiefGrid, ...
+                'Editable', 'off', ...
+                'FontName', 'Consolas');
+            app.ChiefTextArea.Layout.Row = 1;
+            app.ChiefTextArea.Layout.Column = 1;
+            app.ChiefRayTable = uitable(chiefGrid);
+            app.ChiefRayTable.Layout.Row = 2;
+            app.ChiefRayTable.Layout.Column = 1;
+            app.ChiefEventTable = uitable(chiefGrid);
+            app.ChiefEventTable.Layout.Row = 3;
+            app.ChiefEventTable.Layout.Column = 1;
+
+            invariantTab = uitab(app.TabGroup, 'Title', 'Invariant / Phase Space');
+            invariantGrid = uigridlayout(invariantTab, [3 1]);
+            invariantGrid.RowHeight = {96, 130, '1x'};
+            invariantGrid.Padding = [8 8 8 8];
+            invariantGrid.RowSpacing = 8;
+            app.InvariantTextArea = uitextarea(invariantGrid, ...
+                'Editable', 'off', ...
+                'FontName', 'Consolas');
+            app.InvariantTextArea.Layout.Row = 1;
+            app.InvariantTextArea.Layout.Column = 1;
+            app.InvariantSummaryTable = uitable(invariantGrid);
+            app.InvariantSummaryTable.Layout.Row = 2;
+            app.InvariantSummaryTable.Layout.Column = 1;
+            app.PhaseSpaceTable = uitable(invariantGrid);
+            app.PhaseSpaceTable.Layout.Row = 3;
+            app.PhaseSpaceTable.Layout.Column = 1;
+
             equationsTab = uitab(app.TabGroup, 'Title', 'Equations');
             equationsGrid = uigridlayout(equationsTab, [1 1]);
             equationsGrid.Padding = [8 8 8 8];
@@ -219,16 +295,16 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
             prescriptionTab = uitab(app.TabGroup, 'Title', 'Prescription Table');
             prescriptionGrid = uigridlayout(prescriptionTab, [2 1]);
-            prescriptionGrid.RowHeight = {78, '1x'};
+            prescriptionGrid.RowHeight = {116, '1x'};
             prescriptionGrid.ColumnWidth = {'1x'};
             prescriptionGrid.Padding = [8 8 8 8];
             prescriptionGrid.RowSpacing = 8;
 
-            app.PrescriptionButtonGrid = uigridlayout(prescriptionGrid, [2 7]);
+            app.PrescriptionButtonGrid = uigridlayout(prescriptionGrid, [3 7]);
             app.PrescriptionButtonGrid.Layout.Row = 1;
             app.PrescriptionButtonGrid.Layout.Column = 1;
             app.PrescriptionButtonGrid.ColumnWidth = repmat({'1x'}, 1, 7);
-            app.PrescriptionButtonGrid.RowHeight = {32, 32};
+            app.PrescriptionButtonGrid.RowHeight = {32, 32, 32};
             app.PrescriptionButtonGrid.Padding = [0 0 0 0];
             app.PrescriptionButtonGrid.ColumnSpacing = 6;
             app.PrescriptionButtonGrid.RowSpacing = 6;
@@ -262,6 +338,17 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 @(~, ~) app.exportRayTableCsv());
             app.addPrescriptionButton('Export Summary TXT', 2, 7, ...
                 @(~, ~) app.exportSummaryTxt());
+
+            app.addPrescriptionButton('Export Cardinal Data CSV', 3, 1, ...
+                @(~, ~) app.exportCardinalDataCsv());
+            app.addPrescriptionButton('Export Stop/Pupil Data CSV', 3, 2, ...
+                @(~, ~) app.exportPupilDataCsv());
+            app.addPrescriptionButton('Export Chief/Marginal Rays CSV', 3, 3, ...
+                @(~, ~) app.exportChiefMarginalCsv());
+            app.addPrescriptionButton('Export Invariant/Phase-Space CSV', 3, 4, ...
+                @(~, ~) app.exportInvariantPhaseCsv());
+            app.addPrescriptionButton('Export Combined First-Order Report TXT', 3, 5, ...
+                @(~, ~) app.exportCombinedFirstOrderReportTxt());
 
             app.PrescriptionTable = uitable(prescriptionGrid);
             app.PrescriptionTable.Layout.Row = 2;
@@ -339,15 +426,57 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   Prescriptions can be checked, saved, and loaded as CSV or MAT files.'
                 '   Ray result tables can be exported as CSV after a trace is run.'
                 '   The text summary can be exported after a trace is run.'
+                '   Diagnostic tables can be exported as CSV by diagnostic tab group.'
+                '   A combined first-order diagnostics report can be exported as TXT.'
+                '   Diagnostic field y controls chief/marginal and invariant diagnostics.'
                 ''
-                '9. Image solve'
+                '9. Cardinal / Gaussian diagnostics'
+                '   For M = [A B; C D] from z1 to z2, n1 input and n2 output:'
+                '   Delta = n1/n2'
+                '   Phi = -n2*C'
+                '   det(M) = A*D - B*C = n1/n2'
+                '   If abs(C) > tol:'
+                '   f_prime = -1/C'
+                '   f = Delta/C'
+                '   z_H1 = z1 + (D - Delta)/C'
+                '   z_H2 = z2 + (1 - A)/C'
+                '   z_F = z1 + D/C'
+                '   z_Fp = z2 - A/C'
+                '   FFD = D/C'
+                '   BFD = -A/C'
+                '   z_N1 = z1 + (D - 1)/C'
+                '   z_N2 = z2 + (Delta - A)/C'
+                '   If abs(C) <= tol, the system is reported as afocal/zero-power.'
+                ''
+                '10. Aperture stop and pupils'
+                '   Finite aperture candidates constrain launch slopes by:'
+                '   |A_i*y_obj + B_i*u0| <= a_i'
+                '   The axial aperture stop is the tightest finite launch-slope interval.'
+                '   Stop selection is axial-first-order in this milestone.'
+                '   Off-axis fields require vignetting interval diagnostics not implemented yet.'
+                '   Off-axis diagnostics use the selected axial stop and report a warning.'
+                '   Entrance pupil: z_EP = z_front + B_pre/A_pre, r_EP = a_stop/|A_pre|.'
+                '   Exit pupil: x_XP = -B_post/D_post, z_XP = z_rear + x_XP.'
+                '   The selected stop is split by event identity, not by z only.'
+                ''
+                '11. Chief, marginal, and invariant diagnostics'
+                '   Chief ray targets y_stop = 0.'
+                '   Upper and lower marginal rays target +a_stop and -a_stop.'
+                '   r = [y;u] is not canonical when n changes.'
+                '   Canonical momentum coordinate: p = n*u.'
+                '   Lagrange invariant: H = n*(y1*u2 - y2*u1).'
+                '   Raw y-u area is not expected to be conserved when n changes.'
+                '   Invariant conservation is meaningful only where invariant_valid is true.'
+                '   Event-plane invariant samples are labeled state_side = after_event.'
+                ''
+                '12. Image solve'
                 '   Build M_ref = [A B; C D] from object plane to z_ref.'
                 '   z_ref is the last enabled element position.'
                 '   After translating by x: B_total = B + x*D.'
                 '   The image condition is B_total = 0, so x = -B/D.'
                 '   This milestone accepts only z_img >= z_ref.'
                 ''
-                '10. Current limitations'
+                '13. Current limitations'
                 '   Paraxial first-order model only.'
                 '   No exact Snell tracing.'
                 '   No aberration calculation.'
@@ -362,6 +491,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.FieldMaxField.Value = 5;
             app.FieldCountField.Value = 5;
             app.RayCountField.Value = 9;
+            app.DiagnosticFieldField.Value = 0;
             if ~isempty(app.PresetDropdown) && isvalid(app.PresetDropdown)
                 app.PresetDropdown.Value = 'Two thin lenses';
             end
@@ -376,6 +506,16 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             cla(app.RayAxes);
             app.SummaryTextArea.Value = {};
             app.MatrixTable.Data = table();
+            app.CardinalTextArea.Value = {};
+            app.CardinalTable.Data = table();
+            app.PupilTextArea.Value = {};
+            app.PupilCandidateTable.Data = table();
+            app.ChiefTextArea.Value = {};
+            app.ChiefRayTable.Data = table();
+            app.ChiefEventTable.Data = table();
+            app.InvariantTextArea.Value = {};
+            app.InvariantSummaryTable.Data = table();
+            app.PhaseSpaceTable.Data = table();
         end
 
         function loadSelectedPreset(app)
@@ -499,7 +639,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 end
 
                 filename = fullfile(pathName, fileName);
-                writetable(app.makeRayExportTable(), filename);
+                nparaxial_export_table_csv_yu(app.makeRayExportTable(), filename);
                 app.setStatus("Exported ray table CSV: " + string(filename), false);
             catch ME
                 app.setStatus("Export rays error: " + string(ME.message), true);
@@ -522,10 +662,103 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 end
 
                 filename = fullfile(pathName, fileName);
-                app.writeSummaryTextFile(filename);
+                lines = app.summaryExportLines();
+                nparaxial_export_summary_txt_yu(lines, filename);
                 app.setStatus("Exported summary TXT: " + string(filename), false);
             catch ME
                 app.setStatus("Export summary error: " + string(ME.message), true);
+            end
+        end
+
+        function exportCardinalDataCsv(app)
+            try
+                if ~app.hasTraceData("Run Trace before exporting cardinal data.")
+                    return
+                end
+                diag = app.Data.diagnostics;
+                if isempty(diag.cardinal)
+                    app.setStatus("Cardinal diagnostics are unavailable.", true);
+                    return
+                end
+                app.exportTableCsvWithDialog( ...
+                    diag.cardinal.table, ...
+                    'nparaxial_cardinal.csv', ...
+                    'Export Cardinal Data CSV', ...
+                    'Exported cardinal data CSV');
+            catch ME
+                app.setStatus("Export cardinal error: " + string(ME.message), true);
+            end
+        end
+
+        function exportPupilDataCsv(app)
+            try
+                if ~app.hasTraceData("Run Trace before exporting stop/pupil data.")
+                    return
+                end
+                app.exportTableCsvWithDialog( ...
+                    app.makePupilExportTable(), ...
+                    'nparaxial_pupils.csv', ...
+                    'Export Stop/Pupil Data CSV', ...
+                    'Exported stop/pupil data CSV');
+            catch ME
+                app.setStatus("Export pupils error: " + string(ME.message), true);
+            end
+        end
+
+        function exportChiefMarginalCsv(app)
+            try
+                if ~app.hasTraceData("Run Trace before exporting chief/marginal data.")
+                    return
+                end
+                app.exportTableCsvWithDialog( ...
+                    app.makeChiefMarginalExportTable(), ...
+                    'nparaxial_chief_marginal.csv', ...
+                    'Export Chief/Marginal Rays CSV', ...
+                    'Exported chief/marginal rays CSV');
+            catch ME
+                app.setStatus("Export chief/marginal error: " + string(ME.message), true);
+            end
+        end
+
+        function exportInvariantPhaseCsv(app)
+            try
+                if ~app.hasTraceData("Run Trace before exporting invariant/phase-space data.")
+                    return
+                end
+                app.exportTableCsvWithDialog( ...
+                    app.makeInvariantPhaseExportTable(), ...
+                    'nparaxial_invariant_phase_space.csv', ...
+                    'Export Invariant/Phase-Space CSV', ...
+                    'Exported invariant/phase-space CSV');
+            catch ME
+                app.setStatus("Export invariant error: " + string(ME.message), true);
+            end
+        end
+
+        function exportCombinedFirstOrderReportTxt(app)
+            try
+                if ~app.hasTraceData("Run Trace before exporting the first-order report.")
+                    return
+                end
+                [fileName, pathName] = uiputfile( ...
+                    {'*.txt', 'Text files (*.txt)'}, ...
+                    'Export Combined First-Order Report TXT', ...
+                    'nparaxial_first_order_report.txt');
+                if isequal(fileName, 0)
+                    app.setStatus("Export first-order report canceled.", false);
+                    return
+                end
+
+                filename = fullfile(pathName, fileName);
+                lines = nparaxial_combined_report_yu( ...
+                    app.Data.prescription, app.Data.matrixTable, ...
+                    app.Data.img, app.Data.diagnostics, app.Data.summaryLines);
+                nparaxial_export_summary_txt_yu(lines, filename);
+                app.setStatus("Exported first-order report TXT: " + ...
+                    string(filename), false);
+            catch ME
+                app.setStatus("Export first-order report error: " + ...
+                    string(ME.message), true);
             end
         end
 
@@ -582,12 +815,16 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             params.y_max = app.FieldMaxField.Value;
             params.Nfield = round(app.FieldCountField.Value);
             params.Nrays = round(app.RayCountField.Value);
+            params.y_diag = app.DiagnosticFieldField.Value;
 
             if ~isfinite(params.z_obj)
                 error('Object plane z must be finite.');
             end
             if ~isfinite(params.y_min) || ~isfinite(params.y_max)
                 error('Field min and max must be finite.');
+            end
+            if ~isfinite(params.y_diag)
+                error('Diagnostic field height must be finite.');
             end
             if params.Nfield < 1
                 error('Field count must be at least 1.');
@@ -661,6 +898,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             matrixTable = app.makeMatrixTable(img, params.z_obj);
             summaryLines = app.makeSummaryLines( ...
                 params, prescription, img, primaryStop, fieldTable);
+            diagnostics = app.computeFirstOrderDiagnostics( ...
+                params, prescription, img);
 
             data = struct();
             data.params = params;
@@ -673,6 +912,12 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             data.fieldTable = fieldTable;
             data.matrixTable = matrixTable;
             data.summaryLines = summaryLines;
+            data.diagnostics = diagnostics;
+        end
+
+        function diagnostics = computeFirstOrderDiagnostics(~, params, prescription, img)
+            diagnostics = nparaxial_field_diagnostics_yu( ...
+                prescription, params.z_obj, img.z_img, params.y_diag);
         end
 
         function yFields = buildFieldHeights(~, params)
@@ -928,6 +1173,166 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             diag.rms_delta_yf = rms_delta_yf;
         end
 
+        function ok = hasTraceData(app, message)
+            ok = ~(isempty(app.Data) || isempty(fieldnames(app.Data)));
+            if ~ok
+                app.setStatus(message, true);
+            end
+        end
+
+        function exportTableCsvWithDialog(app, T, defaultName, titleText, statusText)
+            if ~istable(T) || isempty(T)
+                app.setStatus("Diagnostic table is empty or unavailable.", true);
+                return
+            end
+
+            [fileName, pathName] = uiputfile( ...
+                {'*.csv', 'CSV files (*.csv)'}, titleText, defaultName);
+            if isequal(fileName, 0)
+                app.setStatus(string(titleText) + " canceled.", false);
+                return
+            end
+
+            filename = fullfile(pathName, fileName);
+            nparaxial_export_table_csv_yu(T, filename);
+            app.setStatus(string(statusText) + ": " + string(filename), false);
+        end
+
+        function lines = summaryExportLines(app)
+            lines = string(app.Data.summaryLines(:));
+            lines(end+1, 1) = "";
+            lines(end+1, 1) = "System matrix / image table";
+            lines(end+1, 1) = "---------------------------";
+            matrixTable = app.Data.matrixTable;
+            for k = 1:height(matrixTable)
+                lines(end+1, 1) = sprintf('%s\t%.12g', ...
+                    matrixTable.quantity(k), matrixTable.value(k)); %#ok<AGROW>
+            end
+        end
+
+        function T = makePupilExportTable(app)
+            diag = app.Data.diagnostics;
+            if isempty(diag.stop)
+                error('Stop/pupil diagnostics are unavailable.');
+            end
+
+            summary = table;
+            summary.quantity = [
+                "diagnostic_field_y"
+                "field_label"
+                "off_axis_warning"
+                "selected_stop_element_id"
+                "selected_stop_z"
+                "selected_stop_aperture_radius"
+            ];
+            summary.value = [
+                string(diag.diagnostic_field_y)
+                string(diag.field_label)
+                string(diag.off_axis_warning)
+                string(diag.stop.selected_element_id)
+                string(diag.stop.selected_z)
+                string(diag.stop.selected_aperture_radius)
+            ];
+
+            T = app.flattenTableForExport(summary, "summary");
+            T = [T; app.flattenTableForExport( ...
+                diag.stop.candidate_table, "aperture_candidates")];
+            if ~isempty(diag.pupil)
+                T = [T; app.flattenTableForExport(diag.pupil.table, "pupil")];
+            end
+        end
+
+        function T = makeChiefMarginalExportTable(app)
+            diag = app.Data.diagnostics;
+            if isempty(diag.chief_marginal)
+                error('Chief/marginal diagnostics are unavailable.');
+            end
+
+            T = diag.chief_marginal.event_table;
+            if isempty(T)
+                T = diag.chief_marginal.ray_table;
+            end
+            diagnostic_field_y = repmat(diag.diagnostic_field_y, height(T), 1);
+            field_label = repmat(diag.field_label, height(T), 1);
+            off_axis_warning = repmat(diag.off_axis_warning, height(T), 1);
+            T = addvars(T, diagnostic_field_y, field_label, off_axis_warning, ...
+                'Before', 1);
+        end
+
+        function T = makeInvariantPhaseExportTable(app)
+            diag = app.Data.diagnostics;
+            if isempty(diag.invariant) && isempty(diag.phase_space)
+                error('Invariant/phase-space diagnostics are unavailable.');
+            end
+
+            context = table;
+            context.quantity = [
+                "diagnostic_field_y"
+                "field_label"
+                "off_axis_warning"
+                "note"
+            ];
+            noteText = "";
+            if ~isempty(diag.invariant)
+                noteText = strjoin(string(diag.invariant.note), "");
+            end
+            context.value = [
+                string(diag.diagnostic_field_y)
+                string(diag.field_label)
+                string(diag.off_axis_warning)
+                noteText
+            ];
+
+            T = app.flattenTableForExport(context, "context");
+            if ~isempty(diag.invariant)
+                T = [T; app.flattenTableForExport( ...
+                    diag.invariant.summary, "invariant_summary")];
+                T = [T; app.flattenTableForExport( ...
+                    diag.invariant.table, "invariant_samples")];
+            end
+            if ~isempty(diag.phase_space)
+                T = [T; app.flattenTableForExport( ...
+                    diag.phase_space, "phase_space")];
+            end
+        end
+
+        function T = flattenTableForExport(app, sourceTable, sectionName)
+            section = strings(0, 1);
+            item = strings(0, 1);
+            value = strings(0, 1);
+
+            if istable(sourceTable) && ~isempty(sourceTable)
+                names = string(sourceTable.Properties.VariableNames);
+                for r = 1:height(sourceTable)
+                    for c = 1:numel(names)
+                        section(end+1, 1) = string(sectionName); %#ok<AGROW>
+                        item(end+1, 1) = "row_" + string(r) + "." + names(c); %#ok<AGROW>
+                        value(end+1, 1) = app.valueToString( ...
+                            sourceTable.(names(c)), r); %#ok<AGROW>
+                    end
+                end
+            end
+
+            T = table(section, item, value);
+        end
+
+        function value = valueToString(~, columnData, row)
+            if iscell(columnData)
+                raw = columnData{row};
+            else
+                raw = columnData(row);
+            end
+
+            if isstring(raw) || ischar(raw)
+                value = string(raw);
+            elseif isnumeric(raw) || islogical(raw)
+                value = string(raw);
+            else
+                value = "<unsupported>";
+            end
+            value = strjoin(value(:).', ",");
+        end
+
         function T = makeRayExportTable(app)
             data = app.Data;
             nRows = 0;
@@ -1104,6 +1509,14 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     app.plotRayDiagram();
                 case "System Matrix / Image Summary"
                     app.updateSummary();
+                case "Cardinal / Gaussian"
+                    app.updateCardinalDiagnostics();
+                case "Stops / Pupils"
+                    app.updatePupilDiagnostics();
+                case "Chief / Marginal Rays"
+                    app.updateChiefMarginalDiagnostics();
+                case "Invariant / Phase Space"
+                    app.updateInvariantDiagnostics();
                 otherwise
                     % Prescription table is directly editable.
             end
@@ -1261,6 +1674,170 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         function updateSummary(app)
             app.SummaryTextArea.Value = app.Data.summaryLines;
             app.MatrixTable.Data = app.Data.matrixTable;
+        end
+
+        function updateCardinalDiagnostics(app)
+            diag = app.Data.diagnostics;
+            if strlength(diag.cardinal_error) > 0
+                app.CardinalTextArea.Value = { ...
+                    'Cardinal diagnostics failed.'; ...
+                    char(diag.cardinal_error)};
+                app.CardinalTable.Data = table();
+                return
+            end
+
+            card = diag.cardinal;
+            app.CardinalTextArea.Value = {
+                'Cardinal / Gaussian diagnostics'
+                '-------------------------------'
+                sprintf('Reference planes: z1 = %.6g, z2 = %.6g', card.z1, card.z2)
+                sprintf('Object/image media: n1 = %.6g, n2 = %.6g', card.n1, card.n2)
+                sprintf('Classification: %s', card.classification)
+                sprintf('Phi = %.6g', card.Phi)
+                sprintf('det(M) = %.12g, expected n1/n2 = %.12g, error = %.3e', ...
+                    card.determinant, card.expected_determinant, ...
+                    card.determinant_error)
+                };
+            app.CardinalTable.Data = card.table;
+        end
+
+        function updatePupilDiagnostics(app)
+            diag = app.Data.diagnostics;
+            if strlength(diag.stop_error) > 0
+                app.PupilTextArea.Value = { ...
+                    'Aperture-stop diagnostics failed.'; ...
+                    char(diag.stop_error)};
+                app.PupilCandidateTable.Data = table();
+                return
+            end
+            if isempty(diag.stop) || ~diag.stop.has_stop
+                note = "No finite aperture stop candidate was selected.";
+                if ~isempty(diag.stop)
+                    note = diag.stop.note;
+                    app.PupilCandidateTable.Data = diag.stop.candidate_table;
+                else
+                    app.PupilCandidateTable.Data = table();
+                end
+                app.PupilTextArea.Value = cellstr(note);
+                return
+            end
+
+            stopDiag = diag.stop;
+            lines = {
+                'Stops / Pupils diagnostics'
+                '--------------------------'
+                'Aperture-stop selection is axial-first-order in this milestone.'
+                sprintf('Diagnostic field height y = %.6g', diag.diagnostic_field_y)
+                sprintf('Field label: %s', diag.field_label)
+                sprintf('Selected aperture stop: %s at z = %.6g, radius = %.6g', ...
+                    stopDiag.selected_element_id, stopDiag.selected_z, ...
+                    stopDiag.selected_aperture_radius)
+                sprintf('Selection rule: %s', stopDiag.note)
+                };
+            if isfield(stopDiag, 'off_axis_warning') && ...
+                    strlength(stopDiag.off_axis_warning) > 0
+                lines{end+1, 1} = char(stopDiag.off_axis_warning);
+            end
+
+            if strlength(diag.pupil_error) > 0
+                lines{end+1, 1} = ['Pupil diagnostics failed: ', ...
+                    char(diag.pupil_error)];
+            elseif ~isempty(diag.pupil)
+                pupil = diag.pupil;
+                lines = [lines; {
+                    sprintf('Entrance pupil z = %.6g, radius = %.6g, m = %.6g', ...
+                        pupil.z_EP, pupil.r_EP, pupil.m_EP)
+                    sprintf('Exit pupil z = %.6g, radius = %.6g, m = %.6g', ...
+                        pupil.z_XP, pupil.r_XP, pupil.m_XP)
+                    sprintf('Pre-stop events = %s', mat2str(pupil.pre_event_indices.'))
+                    sprintf('Post-stop events = %s', mat2str(pupil.post_event_indices.'))
+                    }];
+            end
+
+            app.PupilTextArea.Value = lines;
+            app.PupilCandidateTable.Data = stopDiag.candidate_table;
+        end
+
+        function updateChiefMarginalDiagnostics(app)
+            diag = app.Data.diagnostics;
+            if strlength(diag.chief_error) > 0 || isempty(diag.chief_marginal)
+                app.ChiefTextArea.Value = { ...
+                    'Chief / marginal diagnostics'
+                    '----------------------------'
+                    sprintf('Diagnostic field height y = %.6g', diag.diagnostic_field_y)
+                    sprintf('Field label: %s', diag.field_label)
+                    'Diagnostics are currently axial unless otherwise stated.'
+                    char(diag.off_axis_warning)
+                    char("Chief/marginal diagnostics unavailable: " + diag.chief_error)
+                    };
+                app.ChiefRayTable.Data = table( ...
+                    "Chief/marginal diagnostics unavailable: " + ...
+                    diag.chief_error, ...
+                    'VariableNames', {'message'});
+                app.ChiefEventTable.Data = table();
+                return
+            end
+
+            stopEvent = diag.chief_marginal.stop_event;
+            app.ChiefTextArea.Value = {
+                'Chief / marginal diagnostics'
+                '----------------------------'
+                sprintf('Diagnostic field height y = %.6g', diag.diagnostic_field_y)
+                sprintf('Field label: %s', diag.field_label)
+                'Diagnostics are currently axial unless otherwise stated.'
+                char(diag.off_axis_warning)
+                sprintf('Selected stop: %s (%s), z = %.6g, radius = %.6g', ...
+                    stopEvent.element_id(1), stopEvent.type(1), ...
+                    stopEvent.z(1), stopEvent.aperture_radius(1))
+                };
+            app.ChiefRayTable.Data = diag.chief_marginal.ray_table;
+            app.ChiefEventTable.Data = diag.chief_marginal.event_table;
+        end
+
+        function updateInvariantDiagnostics(app)
+            diag = app.Data.diagnostics;
+            if strlength(diag.invariant_error) > 0 || isempty(diag.invariant)
+                app.InvariantTextArea.Value = { ...
+                    'Invariant / phase-space diagnostics'
+                    '-----------------------------------'
+                    sprintf('Diagnostic field height y = %.6g', diag.diagnostic_field_y)
+                    sprintf('Field label: %s', diag.field_label)
+                    'Invariant uses canonical p = n*u.'
+                    'Raw y-u area is not conserved across refractive-index changes.'
+                    'Invariant conservation is meaningful only where invariant_valid is true.'
+                    char(diag.off_axis_warning)
+                    char("Invariant diagnostics unavailable: " + diag.invariant_error)
+                    };
+                app.InvariantSummaryTable.Data = table( ...
+                    "Invariant diagnostics unavailable: " + ...
+                    diag.invariant_error, ...
+                    'VariableNames', {'message'});
+                app.PhaseSpaceTable.Data = diag.phase_space;
+                return
+            end
+
+            stopText = 'Selected stop unavailable.';
+            if ~isempty(diag.stop) && diag.stop.has_stop
+                stopType = diag.stop.selected_event.type(1);
+                stopText = sprintf('Selected stop: %s (%s), z = %.6g', ...
+                    diag.stop.selected_element_id, stopType, ...
+                    diag.stop.selected_z);
+            end
+            app.InvariantTextArea.Value = {
+                'Invariant / phase-space diagnostics'
+                '-----------------------------------'
+                sprintf('Diagnostic field height y = %.6g', diag.diagnostic_field_y)
+                sprintf('Field label: %s', diag.field_label)
+                'Diagnostics are currently axial unless otherwise stated.'
+                char(diag.off_axis_warning)
+                stopText
+                'Invariant uses canonical p = n*u.'
+                'Raw y-u area is not conserved across refractive-index changes.'
+                'Samples at event planes are after-event states.'
+                'Conservation is meaningful only where invariant_valid is true.'
+                };
+            app.InvariantSummaryTable.Data = diag.invariant.summary;
+            app.PhaseSpaceTable.Data = diag.phase_space;
         end
 
         function setStatus(app, message, isError)
