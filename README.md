@@ -158,6 +158,13 @@ vignetting interval separately at each field point. This plot is
 diagnostic-only and does not change tracing, aperture clipping, matrices,
 image solve, reports, or exact-hit diagnostic state.
 
+Field-sweep range, mode, and point-count controls have their own stale state:
+after changing them, press **Update Validity Plot** before trusting or
+exporting the sweep. Changing only the metric dropdown redraws the current
+stored sweep table without recomputing the trace or marking the optical
+prescription dirty. Field-sweep CSV export writes the current stored sweep
+table and is blocked while the sweep is stale or missing.
+
 If the selected field is fully vignetted, the app does not generate an invalid
 `linspace` and reports that no transmitted aperture-limited ray fan exists. If
 the admitted interval is unbounded or semi-infinite, the app falls back to the

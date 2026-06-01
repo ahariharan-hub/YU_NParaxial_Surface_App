@@ -74,6 +74,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         Data struct
         IsRunning logical = false
         IsDirty logical = true
+        IsValiditySweepDirty logical = true
         SelectedPrescriptionRows double = []
         LastRefreshedTabTitle string = ""
     end
@@ -958,6 +959,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.SelectedPrescriptionRows = [];
             app.Data = struct();
             app.IsDirty = true;
+            app.IsValiditySweepDirty = true;
         end
 
         function resetDefaults(app)
@@ -1211,6 +1213,11 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 if ~app.hasTraceData("Run Trace before exporting validity field sweep.")
                     return
                 end
+                if app.IsValiditySweepDirty
+                    app.setStatus( ...
+                        "Update Validity Plot before exporting field sweep.", true);
+                    return
+                end
                 if ~isfield(app.Data, 'validityFieldSweep') || ...
                         isempty(app.Data.validityFieldSweep) || ...
                         ~isfield(app.Data.validityFieldSweep, 'sweep_summary_table')
@@ -1286,6 +1293,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 data = app.computeCase(params, prescription, img);
                 app.Data = data;
                 app.IsDirty = false;
+                app.IsValiditySweepDirty = true;
                 app.PrescriptionTable.Data = data.prescription;
                 app.refreshSelectedTab();
                 app.setStatus(app.traceStatusMessage(data), false);
@@ -1345,6 +1353,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function clearResults(app)
             app.Data = struct();
+            app.IsValiditySweepDirty = true;
 
             staleText = {'Inputs changed. Run Trace to refresh diagnostics.'};
             if ~isempty(app.RayAxes) && isvalid(app.RayAxes)
@@ -1401,15 +1410,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             if ~isempty(app.ValidityEventTable) && isvalid(app.ValidityEventTable)
                 app.ValidityEventTable.Data = table();
             end
-            if ~isempty(app.ValiditySweepAxes) && isvalid(app.ValiditySweepAxes)
-                cla(app.ValiditySweepAxes);
-                title(app.ValiditySweepAxes, 'Run Trace before field sweep');
-                xlabel(app.ValiditySweepAxes, 'Field height y_{field}');
-                ylabel(app.ValiditySweepAxes, 'metric');
-            end
-            if ~isempty(app.ValiditySweepTable) && isvalid(app.ValiditySweepTable)
-                app.ValiditySweepTable.Data = table();
-            end
+            app.clearValiditySweepDisplay('Run Trace before field sweep');
             if ~isempty(app.ValiditySweepStatusLabel) && ...
                     isvalid(app.ValiditySweepStatusLabel)
                 app.ValiditySweepStatusLabel.Text = ...
@@ -2752,6 +2753,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 sprintf('Rays evaluated = %d', raysEvaluated)
                 sprintf('Worst warning level = %s', worstLevel)
                 'Aperture-limited means admitted by apertures, not paraxial-valid.'
+                'Field-sweep range, mode, and point-count changes invalidate only the stored sweep.'
+                'Metric changes redraw the current stored sweep without recomputing.'
                 'Finite-radius spherical surfaces include a local true-intersection diagnostic.'
                 'It solves one local ray-sphere hit from the paraxial event state.'
                 'The exact hit and exact output angle are not propagated downstream.'
@@ -2765,7 +2768,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.ValiditySummaryTable.Data = validity.summary_table;
             app.ValiditySegmentTable.Data = validity.segment_table;
             app.ValidityEventTable.Data = validity.event_table;
-            if isfield(app.Data, 'validityFieldSweep') && ...
+            if ~app.IsValiditySweepDirty && ...
+                    isfield(app.Data, 'validityFieldSweep') && ...
                     ~isempty(app.Data.validityFieldSweep)
                 app.ValiditySweepTable.Data = ...
                     app.Data.validityFieldSweep.sweep_summary_table;
@@ -2774,8 +2778,33 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         end
 
         function noteValiditySweepControlsChanged(app)
+            app.invalidateValiditySweep( ...
+                "Field-sweep controls changed. Press Update Validity Plot to recompute.");
+        end
+
+        function invalidateValiditySweep(app, message)
+            app.IsValiditySweepDirty = true;
+            if ~isempty(app.Data) && isstruct(app.Data) && ...
+                    isfield(app.Data, 'validityFieldSweep')
+                app.Data = rmfield(app.Data, 'validityFieldSweep');
+            end
+            app.clearValiditySweepDisplay('Update Validity Plot to refresh field sweep');
             app.setValiditySweepStatus( ...
-                "Field sweep controls changed. Press Update Validity Plot.", false);
+                message, false);
+        end
+
+        function clearValiditySweepDisplay(app, plotTitle)
+            if ~isempty(app.ValiditySweepAxes) && isvalid(app.ValiditySweepAxes)
+                cla(app.ValiditySweepAxes);
+                grid(app.ValiditySweepAxes, 'on');
+                box(app.ValiditySweepAxes, 'on');
+                title(app.ValiditySweepAxes, plotTitle);
+                xlabel(app.ValiditySweepAxes, 'Field height y_{field}');
+                ylabel(app.ValiditySweepAxes, 'metric');
+            end
+            if ~isempty(app.ValiditySweepTable) && isvalid(app.ValiditySweepTable)
+                app.ValiditySweepTable.Data = table();
+            end
         end
 
         function updateValidityFieldSweep(app)
@@ -2798,10 +2827,17 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     app.Data.prescription, app.Data.params.z_obj, ...
                     fieldHeights, rayFanSettings, validitySettings, 1e-12);
                 app.Data.validityFieldSweep = sweep;
+                app.IsValiditySweepDirty = false;
                 app.ValiditySweepTable.Data = sweep.sweep_summary_table;
                 app.refreshValiditySweepPlot();
                 app.setStatus("Updated paraxial-validity field sweep.", false);
             catch ME
+                app.IsValiditySweepDirty = true;
+                if ~isempty(app.Data) && isstruct(app.Data) && ...
+                        isfield(app.Data, 'validityFieldSweep')
+                    app.Data = rmfield(app.Data, 'validityFieldSweep');
+                end
+                app.clearValiditySweepDisplay('Update Validity Plot to refresh field sweep');
                 app.setValiditySweepStatus("Field sweep error: " + string(ME.message), true);
                 app.setStatus("Field sweep error: " + string(ME.message), true);
             end
@@ -2842,14 +2878,16 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             if isempty(app.ValiditySweepAxes) || ~isvalid(app.ValiditySweepAxes)
                 return
             end
-            cla(app.ValiditySweepAxes);
-            grid(app.ValiditySweepAxes, 'on');
-            box(app.ValiditySweepAxes, 'on');
-            xlabel(app.ValiditySweepAxes, 'Field height y_{field}');
+            app.clearValiditySweepDisplay('Paraxial validity field sweep');
             metric = string(app.ValiditySweepMetricDropdown.Value);
             ylabel(app.ValiditySweepAxes, char(metric), 'Interpreter', 'none');
             title(app.ValiditySweepAxes, 'Paraxial validity field sweep');
 
+            if app.IsValiditySweepDirty
+                app.setValiditySweepStatus( ...
+                    "Press Update Validity Plot to compute a field sweep.", false);
+                return
+            end
             if isempty(app.Data) || ~isfield(app.Data, 'validityFieldSweep') || ...
                     isempty(app.Data.validityFieldSweep)
                 app.setValiditySweepStatus( ...
