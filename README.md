@@ -128,10 +128,10 @@ The Ray Diagram tab has a ray fan mode control:
 
 The aperture-limited fan means geometrically transmitted by the finite
 apertures in the prescription. It does not mean the ray is paraxial-valid.
-Milestones 2.3.3 and 2.3.4 include propagation penalty, small-angle metrics,
+Milestones 2.3.3-2.3.5 include propagation penalty, small-angle metrics,
 plane-refraction scalar diagnostics, thin-lens angle/deflection diagnostics,
-and vertex-plane spherical-surface scalar diagnostics. True ray-sphere
-intersection validity remains deferred to Milestone 2.3.5.
+vertex-plane spherical-surface scalar diagnostics, and local true-intersection
+spherical diagnostics.
 
 If the selected field is fully vignetted, the app does not generate an invalid
 `linspace` and reports that no transmitted aperture-limited ray fan exists. If
@@ -180,7 +180,11 @@ model. The diagnostic reports `u_in`, paraxial deflection `-y/f`, `u_out`,
 and warning levels from angle/deflection magnitude only.
 
 For a finite-radius spherical refracting surface, Milestone 2.3.4 adds a
-vertex-plane scalar diagnostic. It uses the paraxial event height at the
+vertex-plane scalar diagnostic. Milestone 2.3.5 adds a local true-intersection
+diagnostic. Both are diagnostic only and leave the main paraxial trace,
+aperture clipping, and surface matrix unchanged.
+
+The vertex-plane scalar diagnostic uses the paraxial event height at the
 surface vertex plane and the local spherical-normal angle
 
 ```text
@@ -203,10 +207,45 @@ u_out_exact_vertex ~= alpha + (n1/n2)*(u_in - alpha)
 which reduces to the existing paraxial surface matrix. If `abs(y/R) > 1 +
 tol`, the diagnostic reports an invalid vertex-plane surface normal. If the
 Snell argument exceeds `1 + tol`, it reports TIR. Near-boundary asin arguments
-within tolerance may be clamped for numerical robustness. This diagnostic is
-not true exact spherical ray tracing: it does not intersect the ray with the
-sphere, does not move the event plane, and does not alter the paraxial trace.
-True ray-sphere intersection validity remains deferred to Milestone 2.3.5.
+within tolerance may be clamped for numerical robustness.
+
+The local true-intersection diagnostic solves a ray-sphere hit from the same
+paraxial vertex-plane event state. With local coordinate `s = z - z_v`, the
+surface and incoming diagnostic ray are:
+
+```text
+(s - R)^2 + y^2 = R^2
+y(s) = y0 + s*tan(u_in)
+```
+
+The intersection equation is:
+
+```text
+(1 + t^2)*s^2 + 2*(y0*t - R)*s + y0^2 = 0
+t = tan(u_in)
+```
+
+Candidate roots are selected by consistency with the vertex sag branch:
+
+```text
+sag(y_hit) = R - sign(R)*sqrt(R^2 - y_hit^2)
+residual = abs(s_root - sag(y_hit))
+```
+
+The selected root has the smallest branch residual, with `abs(s)` used only
+as a tie-breaker. The local hit normal uses the same sign convention:
+
+```text
+alpha_hit = -asin(y_hit/R)
+i_hit = u_in - alpha_hit
+u_out_exact_hit = alpha_hit + asin((n1/n2)*sin(i_hit))
+delta_u_exact_hit_vs_paraxial = u_out_exact_hit - u_out_paraxial
+delta_u_hit_vs_vertex = u_out_exact_hit - u_out_exact_vertex
+```
+
+This is not a full exact ray trace. The exact hit point and exact output angle
+are not propagated downstream, and aperture clipping remains the paraxial
+vertex-plane clipping used by the main trace.
 
 ## First-Order Diagnostics
 
@@ -389,7 +428,7 @@ after-event slope and medium index.
 - Paraxial first-order model only.
 - Meridional y-z plane only.
 - No exact Snell tracing in the main trace engine.
-- Finite-radius spherical surfaces use a vertex-plane scalar diagnostic, not true ray-sphere intersection.
+- Finite-radius spherical surfaces use diagnostic-only vertex-plane and local true-intersection comparisons, not a full exact ray trace.
 - No aberration calculation.
 - No Seidel aberration diagnostics.
 - No support yet for final image planes before the last enabled element.

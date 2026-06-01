@@ -102,7 +102,8 @@ function lines = nparaxial_combined_report_yu( ...
         "Meridional y-z plane only."
         "Aperture-limited fan rays are geometrically admitted, not paraxial-validity certified."
         "No exact Snell tracing in the main trace engine."
-        "Finite-radius spherical surfaces use a vertex-plane scalar diagnostic, not true ray-sphere intersection."
+        "Finite-radius spherical surfaces use diagnostic-only vertex-plane and local true-intersection comparisons."
+        "Exact-hit results are not propagated downstream and aperture clipping remains paraxial."
         "No Seidel aberration calculation."
         "No lithography optimization."
         "Axial aperture stop selection remains distinct from off-axis lower/upper cone limiting apertures."
@@ -125,9 +126,11 @@ function lines = append_paraxial_validity_local(lines, validity)
         "u is the paraxial ray angle in radians; no atan(u) reinterpretation is used."
         "Aperture-limited rays are geometrically admitted, not paraxial-validity certified."
         "Milestone 2.3.4 includes vertex-plane scalar validity for finite-radius spherical surfaces."
+        "Milestone 2.3.5 includes local true-intersection diagnostics for finite-radius spherical surfaces."
         "The surface-normal convention is alpha = -asin(y/R)."
-        "Surface scalar rows use y_before at the vertex plane; no ray-sphere intersection is solved."
-        "True ray-sphere intersection remains deferred to Milestone 2.3.5."
+        "True-hit rows use alpha_hit = -asin(y_hit/R)."
+        "Exact hit and exact output angle are not propagated downstream."
+        "Aperture clipping remains paraxial vertex-plane clipping."
         ];
     lines = append_section_local(lines, "Paraxial validity diagnostics", text);
     lines = append_table_local(lines, "Paraxial validity thresholds", ...
