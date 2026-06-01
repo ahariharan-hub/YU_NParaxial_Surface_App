@@ -117,6 +117,23 @@ the blocking element plane. Element planes are labeled by element ID and type;
 thin lenses, refracting surfaces, stops, and dummy planes use distinct line
 styles.
 
+Milestone 2.4 adds display-only graphical overlays:
+
+- Spherical surface curves: finite-radius surfaces are drawn with the vertex
+  branch `z = z_v + R - sign(R)*sqrt(R^2 - y^2)`. `R > 0` curves sag toward
+  larger `z`; `R < 0` curves sag toward smaller `z`. If the aperture is
+  infinite, the plotted height is a visual fallback and not a physical stop.
+- First-segment paraxial penalty: an optional dashed exact-angle diagnostic
+  line compares `y + d*u` with `y + d*tan(u)` only from the object plane to
+  the first enabled element. The marker shows `delta_y = d*(tan(u)-u)`.
+- Surface-angle schematic: an optional vertex-plane annotation shows `u`,
+  the surface normal angle `alpha = -asin(y/R)`, and incidence
+  `theta = u - alpha` in degrees for one finite-radius surface event.
+
+These overlays are graphical diagnostics only. They do not affect tracing,
+aperture clipping, matrices, image solve, reports, or any exact-hit diagnostic
+state.
+
 ## Ray Fan Sampling
 
 The Ray Diagram tab has a ray fan mode control:

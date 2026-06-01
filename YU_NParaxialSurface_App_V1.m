@@ -33,6 +33,9 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         ManualUMaxField matlab.ui.control.NumericEditField
         PresetDropdown matlab.ui.control.DropDown
         RayFanModeDropdown matlab.ui.control.DropDown
+        SurfaceCurvesCheckBox matlab.ui.control.CheckBox
+        FirstSegmentPenaltyCheckBox matlab.ui.control.CheckBox
+        SurfaceAngleSchematicCheckBox matlab.ui.control.CheckBox
 
         RayAxes matlab.ui.control.UIAxes
         SummaryTextArea matlab.ui.control.TextArea
@@ -210,7 +213,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
             rayTab = uitab(app.TabGroup, 'Title', 'Ray Diagram');
             rayGrid = uigridlayout(rayTab, [2 1]);
-            rayGrid.RowHeight = {270, '1x'};
+            rayGrid.RowHeight = {335, '1x'};
             rayGrid.ColumnWidth = {'1x'};
             rayGrid.Padding = [8 8 8 8];
             rayGrid.RowSpacing = 8;
@@ -229,8 +232,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             controlsPanel.Layout.Row = 1;
             controlsPanel.Layout.Column = 1;
 
-            app.PrescriptionButtonGrid = uigridlayout(controlsPanel, [7 2]);
-            app.PrescriptionButtonGrid.RowHeight = {24, 24, 28, 28, 28, 28, 30};
+            app.PrescriptionButtonGrid = uigridlayout(controlsPanel, [10 2]);
+            app.PrescriptionButtonGrid.RowHeight = {24, 24, 22, 24, 24, 28, 28, 28, 28, 30};
             app.PrescriptionButtonGrid.ColumnWidth = {'1x', '1x'};
             app.PrescriptionButtonGrid.Padding = [8 8 8 8];
             app.PrescriptionButtonGrid.RowSpacing = 5;
@@ -262,23 +265,50 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.ManualUMaxField.Layout.Row = 2;
             app.ManualUMaxField.Layout.Column = 2;
 
-            app.addPrescriptionButton('Add Thin Lens', 3, 1, ...
+            overlayLabel = uilabel(app.PrescriptionButtonGrid, ...
+                'Text', 'Graphics overlays', ...
+                'FontWeight', 'bold');
+            overlayLabel.Layout.Row = 3;
+            overlayLabel.Layout.Column = [1 2];
+
+            app.SurfaceCurvesCheckBox = uicheckbox(app.PrescriptionButtonGrid, ...
+                'Text', 'Surface curves', ...
+                'Value', true, ...
+                'ValueChangedFcn', @(~, ~) app.refreshRayDiagramDisplay());
+            app.SurfaceCurvesCheckBox.Layout.Row = 4;
+            app.SurfaceCurvesCheckBox.Layout.Column = 1;
+
+            app.FirstSegmentPenaltyCheckBox = uicheckbox(app.PrescriptionButtonGrid, ...
+                'Text', 'First-segment penalty', ...
+                'Value', false, ...
+                'ValueChangedFcn', @(~, ~) app.refreshRayDiagramDisplay());
+            app.FirstSegmentPenaltyCheckBox.Layout.Row = 4;
+            app.FirstSegmentPenaltyCheckBox.Layout.Column = 2;
+
+            app.SurfaceAngleSchematicCheckBox = uicheckbox(app.PrescriptionButtonGrid, ...
+                'Text', 'Surface-angle schematic', ...
+                'Value', false, ...
+                'ValueChangedFcn', @(~, ~) app.refreshRayDiagramDisplay());
+            app.SurfaceAngleSchematicCheckBox.Layout.Row = 5;
+            app.SurfaceAngleSchematicCheckBox.Layout.Column = [1 2];
+
+            app.addPrescriptionButton('Add Thin Lens', 6, 1, ...
                 @(~, ~) app.addPrescriptionRow("thinlens"));
-            app.addPrescriptionButton('Add Surface', 3, 2, ...
+            app.addPrescriptionButton('Add Surface', 6, 2, ...
                 @(~, ~) app.addPrescriptionRow("surface"));
-            app.addPrescriptionButton('Add Stop', 4, 1, ...
+            app.addPrescriptionButton('Add Stop', 7, 1, ...
                 @(~, ~) app.addPrescriptionRow("stop"));
-            app.addPrescriptionButton('Add Dummy', 4, 2, ...
+            app.addPrescriptionButton('Add Dummy', 7, 2, ...
                 @(~, ~) app.addPrescriptionRow("dummy"));
-            app.addPrescriptionButton('Duplicate Row', 5, 1, ...
+            app.addPrescriptionButton('Duplicate Row', 8, 1, ...
                 @(~, ~) app.duplicatePrescriptionRow());
-            app.addPrescriptionButton('Delete Selected Row', 5, 2, ...
+            app.addPrescriptionButton('Delete Selected Row', 8, 2, ...
                 @(~, ~) app.deleteSelectedPrescriptionRows());
-            app.addPrescriptionButton('Sort Prescription', 6, 1, ...
+            app.addPrescriptionButton('Sort Prescription', 9, 1, ...
                 @(~, ~) app.sortPrescriptionTable());
-            app.addPrescriptionButton('Check Prescription', 6, 2, ...
+            app.addPrescriptionButton('Check Prescription', 9, 2, ...
                 @(~, ~) app.checkPrescription());
-            app.addPrescriptionButton('Run Trace', 7, [1 2], ...
+            app.addPrescriptionButton('Run Trace', 10, [1 2], ...
                 @(~, ~) app.runTrace());
 
             app.PrescriptionTable = uitable(rayTopGrid);
@@ -672,6 +702,10 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   If the selected field is fully vignetted, no invalid fan is generated.'
                 '   If the interval is unbounded, the app falls back to the manual fan.'
                 '   Aperture-limited means geometrically admitted, not paraxial-valid.'
+                '   Surface curves visually represent finite-radius spherical surfaces.'
+                '   The first-segment penalty overlay compares y + d*u with y + d*tan(u).'
+                '   Surface-angle schematics show u and incidence theta in degrees.'
+                '   These graphical overlays do not affect tracing, clipping, matrices, image solve, or reports.'
                 '   Milestones 2.3.3-2.3.5 include propagation penalty, small-angle metrics,'
                 '   plane-refraction scalar diagnostics, thin-lens angle/deflection diagnostics,'
                 '   vertex-plane spherical diagnostics, and local true-intersection diagnostics.'
@@ -1131,6 +1165,18 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function requestTrace(app)
             app.markDirty("");
+        end
+
+        function refreshRayDiagramDisplay(app)
+            if isempty(app.Data) || isempty(fieldnames(app.Data))
+                app.setStatus("Overlay setting changed. Run Trace to draw ray diagram.", false);
+                return
+            end
+
+            if string(app.TabGroup.SelectedTab.Title) == "Ray Diagram"
+                app.plotRayDiagram();
+            end
+            app.setStatus("Ray diagram overlay display refreshed.", false);
         end
 
         function markDirty(app, reason)
@@ -2127,6 +2173,19 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             yLim = [yMin - yPad, yMax + yPad];
             ylim(ax, yLim);
 
+            if app.surfaceCurvesEnabled()
+                yFallback = max(abs(yLim));
+                for k = 1:height(data.enabledElements)
+                    element = data.enabledElements(k, :);
+                    if element.type(1) == "surface" && isfinite(element.radius_R(1))
+                        [zCurve, ~, ~] = nparaxial_surface_curve_points_yu( ...
+                            element.z(1), element.radius_R(1), ...
+                            element.aperture_radius(1), yFallback, 121, 1e-12);
+                        zVals = [zVals; zCurve(:)]; %#ok<AGROW>
+                    end
+                end
+            end
+
             for k = 1:height(data.enabledElements)
                 element = data.enabledElements(k, :);
                 app.drawElement(ax, element, yLim);
@@ -2147,13 +2206,20 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             xPad = 0.04*(xMax - xMin);
             xlim(ax, [xMin - xPad, xMax + xPad]);
 
+            if app.firstSegmentPenaltyEnabled()
+                app.drawFirstSegmentPenaltyOverlay(ax, data);
+            end
+            if app.surfaceAngleSchematicEnabled()
+                app.drawSurfaceAngleSchematicOverlay(ax, data);
+            end
+
             xlabel(ax, 'z');
             ylabel(ax, 'y');
             title(ax, "N-element paraxial ray trace - " + data.rayFanLabel);
             hold(ax, 'off');
         end
 
-        function drawElement(~, ax, element, yLim)
+        function drawElement(app, ax, element, yLim)
             z = element.z(1);
             a = element.aperture_radius(1);
             typeName = element.type(1);
@@ -2174,7 +2240,27 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     lineStyle = ':';
             end
 
-            if isfinite(a)
+            drewSurfaceCurve = false;
+            if typeName == "surface" && app.surfaceCurvesEnabled()
+                yFallback = max(abs(yLim));
+                [zCurve, yCurve, curveInfo] = nparaxial_surface_curve_points_yu( ...
+                    z, element.radius_R(1), a, yFallback, 121, 1e-12);
+                if curveInfo.is_finite_surface && ~curveInfo.invalid_curve_flag
+                    plot(ax, zCurve, yCurve, ...
+                        'Color', color, ...
+                        'LineStyle', '-', ...
+                        'LineWidth', 1.8);
+                    drewSurfaceCurve = true;
+                elseif curveInfo.is_finite_surface
+                    plot(ax, zCurve, yCurve, ...
+                        'Color', color, ...
+                        'LineStyle', '-', ...
+                        'LineWidth', 1.4);
+                    drewSurfaceCurve = true;
+                end
+            end
+
+            if isfinite(a) && ~drewSurfaceCurve
                 plot(ax, [z, z], [-a, a], ...
                     'Color', color, ...
                     'LineStyle', lineStyle, ...
@@ -2182,16 +2268,122 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 plot(ax, z, a, 'v', 'Color', color, 'MarkerSize', 5);
                 plot(ax, z, -a, '^', 'Color', color, 'MarkerSize', 5);
             else
-                plot(ax, [z, z], yLim, ...
-                    'Color', color, ...
-                    'LineStyle', lineStyle, ...
-                    'LineWidth', 1.1);
+                if ~drewSurfaceCurve
+                    plot(ax, [z, z], yLim, ...
+                        'Color', color, ...
+                        'LineStyle', lineStyle, ...
+                        'LineWidth', 1.1);
+                end
+            end
+
+            if isfinite(a) && drewSurfaceCurve
+                plot(ax, z, a, 'v', 'Color', color, 'MarkerSize', 5);
+                plot(ax, z, -a, '^', 'Color', color, 'MarkerSize', 5);
             end
 
             text(ax, z, yLim(1), ...
                 " " + element.element_id(1) + " (" + typeName + ")", ...
                 'VerticalAlignment', 'bottom', ...
                 'Color', color);
+        end
+
+        function drawFirstSegmentPenaltyOverlay(app, ax, data)
+            if isempty(data.enabledElements)
+                return
+            end
+
+            zFirst = data.enabledElements.z(1);
+            overlay = nparaxial_first_segment_penalty_overlay_yu( ...
+                data.bundleSet, data.params.z_obj, zFirst, 1e-12);
+            validRows = overlay(overlay.valid_overlay, :);
+            if isempty(validRows)
+                if ~isempty(overlay)
+                    app.setStatus(string(overlay.note(1)), false);
+                end
+                return
+            end
+
+            overlayColor = [0.35 0.35 0.35];
+            markerColor = [0.2 0.2 0.2];
+            maxLabeled = min(3, height(validRows));
+            for k = 1:height(validRows)
+                row = validRows(k, :);
+                plot(ax, [row.z_start, row.z_end], ...
+                    [row.y_exact_start, row.y_exact_end], ...
+                    '--', 'Color', [0.62 0.62 0.62], ...
+                    'LineWidth', 0.9);
+                plot(ax, [row.z_end, row.z_end], ...
+                    [row.y_paraxial_end, row.y_exact_end], ...
+                    '-', 'Color', markerColor, 'LineWidth', 0.8);
+                if k <= maxLabeled
+                    text(ax, row.z_end, row.y_exact_end, ...
+                        sprintf('  \\Deltay=%.3g, u=%.2f deg', ...
+                        row.delta_y_first_segment, row.u_deg), ...
+                        'Color', overlayColor, ...
+                        'FontSize', 8, ...
+                        'VerticalAlignment', 'middle');
+                end
+            end
+        end
+
+        function drawSurfaceAngleSchematicOverlay(~, ax, data)
+            [eventRow, found] = firstFiniteSurfaceEventLocal(data);
+            if ~found
+                return
+            end
+
+            schematic = nparaxial_surface_angle_schematic_yu( ...
+                eventRow.y_before(1), eventRow.u_before(1), ...
+                eventRow.radius_R(1), 1e-12);
+            if ~schematic.valid_schematic(1)
+                return
+            end
+
+            xLim = xlim(ax);
+            yLim = ylim(ax);
+            z0 = eventRow.z(1);
+            y0 = eventRow.y_before(1);
+            scale = 0.10*min(diff(xLim), diff(yLim));
+            if ~isfinite(scale) || scale <= 0
+                scale = 1;
+            end
+
+            u = eventRow.u_before(1);
+            alpha = schematic.alpha(1);
+            normalColor = [0.25 0.25 0.25];
+            rayColor = [0.1 0.25 0.65];
+            axisColor = [0.25 0.25 0.25];
+
+            plot(ax, [z0 - scale, z0 + scale], [y0, y0], ...
+                ':', 'Color', axisColor, 'LineWidth', 0.8);
+            plot_angle_line_local(ax, z0, y0, u, scale, rayColor, '-');
+            plot_angle_line_local(ax, z0, y0, alpha, scale, normalColor, '--');
+            plot_arc_local(ax, z0, y0, 0, u, 0.42*scale, rayColor);
+            plot_arc_local(ax, z0, y0, alpha, u, 0.62*scale, normalColor);
+
+            text(ax, z0 + 0.15*scale, y0 + 0.85*scale, ...
+                sprintf('vertex-plane surface-angle schematic\\nu=%.2f deg, \\theta=%.2f deg', ...
+                schematic.u_deg(1), schematic.theta_deg(1)), ...
+                'Color', normalColor, ...
+                'FontSize', 8, ...
+                'VerticalAlignment', 'bottom');
+        end
+
+        function tf = surfaceCurvesEnabled(app)
+            tf = ~isempty(app.SurfaceCurvesCheckBox) && ...
+                isvalid(app.SurfaceCurvesCheckBox) && app.SurfaceCurvesCheckBox.Value;
+        end
+
+        function tf = firstSegmentPenaltyEnabled(app)
+            tf = ~isempty(app.FirstSegmentPenaltyCheckBox) && ...
+                isvalid(app.FirstSegmentPenaltyCheckBox) && ...
+                app.FirstSegmentPenaltyCheckBox.Value;
+        end
+
+        function tf = surfaceAngleSchematicEnabled(app)
+            tf = ~isempty(app.SurfaceAngleSchematicCheckBox) && ...
+                isvalid(app.SurfaceAngleSchematicCheckBox) && ...
+                app.SurfaceAngleSchematicCheckBox.Value;
         end
 
         function [color, width, style] = rayStyle(~, rayName, isBlocked)
@@ -2535,4 +2727,51 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
         end
     end
+end
+
+
+function [eventRow, found] = firstFiniteSurfaceEventLocal(data)
+    eventRow = table();
+    found = false;
+    if ~isfield(data, 'bundleSet')
+        return
+    end
+
+    for q = 1:numel(data.bundleSet)
+        bundle = data.bundleSet(q).bundle;
+        for r = 1:numel(bundle)
+            events = bundle(r).res.events;
+            if isempty(events)
+                continue
+            end
+            mask = events.type == "surface" & isfinite(events.radius_R) & ...
+                events.passed_aperture;
+            idx = find(mask, 1, 'first');
+            if ~isempty(idx)
+                eventRow = events(idx, :);
+                found = true;
+                return
+            end
+        end
+    end
+end
+
+
+function plot_angle_line_local(ax, z0, y0, angle, scale, color, style)
+    dz = scale*cos(angle);
+    dy = scale*sin(angle);
+    plot(ax, [z0 - dz, z0 + dz], [y0 - dy, y0 + dy], ...
+        style, 'Color', color, 'LineWidth', 1.0);
+end
+
+
+function plot_arc_local(ax, z0, y0, angle1, angle2, radius, color)
+    if ~isfinite(angle1) || ~isfinite(angle2) || ~isfinite(radius) || radius <= 0
+        return
+    end
+    n = 32;
+    theta = linspace(angle1, angle2, n);
+    z = z0 + radius*cos(theta);
+    y = y0 + radius*sin(theta);
+    plot(ax, z, y, '-', 'Color', color, 'LineWidth', 0.8);
 end
