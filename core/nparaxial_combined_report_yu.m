@@ -126,6 +126,7 @@ function lines = append_paraxial_validity_local(lines, validity)
         "Aperture-limited rays are geometrically admitted, not paraxial-validity certified."
         "Milestone 2.3.4 includes vertex-plane scalar validity for finite-radius spherical surfaces."
         "The surface-normal convention is alpha = -asin(y/R)."
+        "Surface scalar rows use y_before at the vertex plane; no ray-sphere intersection is solved."
         "True ray-sphere intersection remains deferred to Milestone 2.3.5."
         ];
     lines = append_section_local(lines, "Paraxial validity diagnostics", text);

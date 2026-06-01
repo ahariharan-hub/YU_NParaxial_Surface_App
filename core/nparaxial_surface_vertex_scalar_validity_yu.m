@@ -50,7 +50,8 @@ function diag = nparaxial_surface_vertex_scalar_validity_yu( ...
     snellArg = NaN(size(normalArg));
     snellArg(normalValid) = ratio .* sin(incidence(normalValid));
     tirFlag = normalValid & abs(snellArg) > 1 + tol;
-    snellValid = normalValid & ~tirFlag & isfinite(snellArg);
+    snellNonfinite = normalValid & ~isfinite(snellArg);
+    snellValid = normalValid & ~tirFlag & ~snellNonfinite;
     snellClamped = NaN(size(normalArg));
     snellClamped(snellValid) = min(max(snellArg(snellValid), -1), 1);
     snellClampFlag = snellValid & abs(snellArg) > 1;
@@ -63,7 +64,8 @@ function diag = nparaxial_surface_vertex_scalar_validity_yu( ...
 
     exactNonfinite = snellValid & ~isfinite(uExact);
     grazingNormal = normalValid & abs(normalClamped) >= 1 - sqrt(tol);
-    invalidFlag = normalInvalid | exactNonfinite | grazingNormal;
+    invalidFlag = normalInvalid | snellNonfinite | exactNonfinite | ...
+        grazingNormal;
 
     inMetrics = nparaxial_angle_validity_metrics_yu(u_in, tol);
     outMetrics = nparaxial_angle_validity_metrics_yu(u_out_paraxial, tol);
@@ -82,19 +84,9 @@ function diag = nparaxial_surface_vertex_scalar_validity_yu( ...
         max_level_local(inLevels, outLevels), ...
         max_level_local(exactLevels, incidenceLevels));
 
-    notes = repmat( ...
-        "Vertex-plane scalar Snell comparison; no true ray-sphere intersection.", ...
-        numel(y), 1);
-    notes(normalInvalid) = ...
-        "Invalid vertex-plane spherical normal: abs(y/R) > 1 + tol.";
-    notes(surfaceClamp & ~normalInvalid) = ...
-        "Normal argument clamped within tolerance for asin.";
-    notes(tirFlag) = ...
-        "Vertex-plane scalar Snell diagnostic flags TIR; paraxial trace unchanged.";
-    notes(grazingNormal & ~normalInvalid & ~tirFlag) = ...
-        "Surface normal is near grazing at abs(y/R) ~= 1; warning forced severe.";
-    notes(snellClampFlag & ~tirFlag) = ...
-        "Snell argument clamped within tolerance for asin.";
+    notes = build_notes_local( ...
+        numel(y), surfaceClamp, snellClampFlag, normalInvalid, ...
+        tirFlag, grazingNormal, snellNonfinite, exactNonfinite);
 
     diag = struct();
     diag.surface_alpha_vertex = alpha;
@@ -113,6 +105,47 @@ function diag = nparaxial_surface_vertex_scalar_validity_yu( ...
     diag.tir_flag = tirFlag;
     diag.warning_level = levels;
     diag.note = notes;
+end
+
+
+function notes = build_notes_local( ...
+    n, surfaceClamp, snellClampFlag, normalInvalid, tirFlag, ...
+    grazingNormal, snellNonfinite, exactNonfinite)
+
+    notes = strings(n, 1);
+    for k = 1:n
+        fragments = ...
+            "Vertex-plane scalar Snell comparison; no true ray-sphere intersection.";
+        if surfaceClamp(k)
+            fragments(end+1, 1) = ...
+                "Normal argument clamped within tolerance for asin."; %#ok<AGROW>
+        end
+        if snellClampFlag(k)
+            fragments(end+1, 1) = ...
+                "Snell argument clamped within tolerance for asin."; %#ok<AGROW>
+        end
+        if normalInvalid(k)
+            fragments(end+1, 1) = ...
+                "Invalid vertex-plane spherical normal: abs(y/R) > 1 + tol."; %#ok<AGROW>
+        end
+        if tirFlag(k)
+            fragments(end+1, 1) = ...
+                "Vertex-plane scalar Snell diagnostic flags TIR; paraxial trace unchanged."; %#ok<AGROW>
+        end
+        if grazingNormal(k)
+            fragments(end+1, 1) = ...
+                "Surface normal is near grazing at abs(y/R) ~= 1; warning forced severe."; %#ok<AGROW>
+        end
+        if snellNonfinite(k)
+            fragments(end+1, 1) = ...
+                "Snell argument is nonfinite; exact vertex output is not computed."; %#ok<AGROW>
+        end
+        if exactNonfinite(k)
+            fragments(end+1, 1) = ...
+                "Exact vertex scalar output is nonfinite."; %#ok<AGROW>
+        end
+        notes(k) = strjoin(cellstr(fragments), '; ');
+    end
 end
 
 

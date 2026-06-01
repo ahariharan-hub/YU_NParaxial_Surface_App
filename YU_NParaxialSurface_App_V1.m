@@ -2388,6 +2388,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 sprintf('Worst warning level = %s', worstLevel)
                 'Aperture-limited means admitted by apertures, not paraxial-valid.'
                 'Finite-radius spherical surfaces use a vertex-plane scalar diagnostic.'
+                'Surface scalar rows use y_before at the vertex plane; no ray-sphere intersection is solved.'
                 'This uses y at the vertex plane and does not perform true ray-sphere intersection.'
                 'Thresholds: ok <=0.05 rad and rel tan error <1e-3; notice <=0.10 rad or <5e-3; warning <=0.20 rad or <2e-2; severe otherwise, TIR, invalid asin, tan singularity, or nonfinite values.'
                 ''
