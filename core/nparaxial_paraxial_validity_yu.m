@@ -37,7 +37,8 @@ function validity = nparaxial_paraxial_validity_yu( ...
         "Diagnostic only: main tracing remains paraxial."
         "u is the paraxial ray angle in radians."
         "Aperture-limited rays are geometrically admitted, not paraxial-validity certified."
-        "Spherical-surface scalar validity is deferred to Milestone 2.3.4."
+        "Finite-radius spherical surfaces use a vertex-plane scalar diagnostic."
+        "True ray-sphere intersection remains deferred to Milestone 2.3.5."
         ];
 end
 
@@ -50,6 +51,7 @@ function summaryTable = build_summary_table_local(bundleSet, segmentTable, event
     worstAngle = zeros(0, 1);
     worstTranslation = zeros(0, 1);
     worstPlaneDelta = zeros(0, 1);
+    worstSurfaceVertexDelta = zeros(0, 1);
     maxLensDeflection = zeros(0, 1);
     tirCount = zeros(0, 1);
     severeCount = zeros(0, 1);
@@ -99,6 +101,9 @@ function summaryTable = build_summary_table_local(bundleSet, segmentTable, event
             planeMask = evtRows.diagnostic_type == "plane_refraction";
             worstPlaneDelta(end+1, 1) = signed_max_abs_local( ...
                 evtRows.delta_u(planeMask)); %#ok<AGROW>
+            surfaceMask = evtRows.diagnostic_type == "spherical_vertex_scalar";
+            worstSurfaceVertexDelta(end+1, 1) = signed_max_abs_local( ...
+                evtRows.delta_u_vertex_scalar(surfaceMask)); %#ok<AGROW>
             maxLensDeflection(end+1, 1) = max_or_nan_local( ...
                 evtRows.abs_thinlens_deflection); %#ok<AGROW>
             tirCount(end+1, 1) = sum(evtRows.tir_flag); %#ok<AGROW>
@@ -119,6 +124,7 @@ function summaryTable = build_summary_table_local(bundleSet, segmentTable, event
     summaryTable.worst_angle_deg = worstAngle;
     summaryTable.worst_translation_delta_y = worstTranslation;
     summaryTable.worst_plane_refraction_delta_u = worstPlaneDelta;
+    summaryTable.worst_surface_vertex_delta_u = worstSurfaceVertexDelta;
     summaryTable.max_thinlens_deflection = maxLensDeflection;
     summaryTable.tir_count = tirCount;
     summaryTable.severe_count = severeCount;

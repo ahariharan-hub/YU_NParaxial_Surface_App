@@ -55,6 +55,19 @@ function row = event_row_local(rayName, fieldId, ev, tol)
     tirFlag = false;
     thinlensDeflection = NaN;
     absThinlensDeflection = NaN;
+    surfaceAlphaVertex = NaN;
+    surfaceAlphaParaxial = NaN;
+    surfaceIncidenceExact = NaN;
+    surfaceIncidenceParaxial = NaN;
+    surfaceNormalArgument = NaN;
+    surfaceNormalArgumentClamped = NaN;
+    surfaceSasinClampedFlag = false;
+    surfaceSnellArgument = NaN;
+    surfaceSnellArgumentClamped = NaN;
+    snellClampedFlag = false;
+    uOutExactVertex = NaN;
+    deltaUVertexScalar = NaN;
+    invalidSurfaceNormalFlag = false;
     note = "";
     warningLevel = max_level_local(inLevel, outLevel);
 
@@ -92,8 +105,34 @@ function row = event_row_local(rayName, fieldId, ev, tol)
                         note = "Plane surface with unchanged medium; angle metrics only.";
                     end
                 else
-                    diagnosticType = "spherical_surface_deferred";
-                    note = "Spherical-surface scalar validity is deferred to Milestone 2.3.4.";
+                    surface = nparaxial_surface_vertex_scalar_validity_yu( ...
+                        ev.y_before(1), uBefore, nBefore, nAfter, R, ...
+                        uAfter, tol);
+                    diagnosticType = "spherical_vertex_scalar";
+                    surfaceAlphaVertex = surface.surface_alpha_vertex(1);
+                    surfaceAlphaParaxial = surface.surface_alpha_paraxial(1);
+                    surfaceIncidenceExact = ...
+                        surface.surface_incidence_exact(1);
+                    surfaceIncidenceParaxial = ...
+                        surface.surface_incidence_paraxial(1);
+                    surfaceNormalArgument = ...
+                        surface.surface_normal_argument(1);
+                    surfaceNormalArgumentClamped = ...
+                        surface.surface_normal_argument_clamped(1);
+                    surfaceSasinClampedFlag = ...
+                        surface.surface_sasin_clamped_flag(1);
+                    surfaceSnellArgument = surface.surface_snell_argument(1);
+                    surfaceSnellArgumentClamped = ...
+                        surface.surface_snell_argument_clamped(1);
+                    snellClampedFlag = surface.snell_clamped_flag(1);
+                    uOutExactVertex = surface.u_out_exact_vertex(1);
+                    deltaUVertexScalar = surface.delta_u_vertex_scalar(1);
+                    invalidSurfaceNormalFlag = ...
+                        surface.invalid_surface_normal_flag(1);
+                    deltaU = deltaUVertexScalar;
+                    tirFlag = surface.tir_flag(1);
+                    warningLevel = surface.warning_level(1);
+                    note = surface.note(1);
                 end
 
             case {"stop", "dummy"}
@@ -129,6 +168,19 @@ function row = event_row_local(rayName, fieldId, ev, tol)
     row.tir_flag = tirFlag;
     row.thinlens_deflection = thinlensDeflection;
     row.abs_thinlens_deflection = absThinlensDeflection;
+    row.surface_alpha_vertex = surfaceAlphaVertex;
+    row.surface_alpha_paraxial = surfaceAlphaParaxial;
+    row.surface_incidence_exact = surfaceIncidenceExact;
+    row.surface_incidence_paraxial = surfaceIncidenceParaxial;
+    row.surface_normal_argument = surfaceNormalArgument;
+    row.surface_normal_argument_clamped = surfaceNormalArgumentClamped;
+    row.surface_sasin_clamped_flag = surfaceSasinClampedFlag;
+    row.surface_snell_argument = surfaceSnellArgument;
+    row.surface_snell_argument_clamped = surfaceSnellArgumentClamped;
+    row.snell_clamped_flag = snellClampedFlag;
+    row.u_out_exact_vertex = uOutExactVertex;
+    row.delta_u_vertex_scalar = deltaUVertexScalar;
+    row.invalid_surface_normal_flag = invalidSurfaceNormalFlag;
     row.warning_level = warningLevel;
     row.note = string(note);
 end
@@ -154,6 +206,19 @@ function T = empty_event_table_local()
     T.tir_flag = false(0, 1);
     T.thinlens_deflection = zeros(0, 1);
     T.abs_thinlens_deflection = zeros(0, 1);
+    T.surface_alpha_vertex = zeros(0, 1);
+    T.surface_alpha_paraxial = zeros(0, 1);
+    T.surface_incidence_exact = zeros(0, 1);
+    T.surface_incidence_paraxial = zeros(0, 1);
+    T.surface_normal_argument = zeros(0, 1);
+    T.surface_normal_argument_clamped = zeros(0, 1);
+    T.surface_sasin_clamped_flag = false(0, 1);
+    T.surface_snell_argument = zeros(0, 1);
+    T.surface_snell_argument_clamped = zeros(0, 1);
+    T.snell_clamped_flag = false(0, 1);
+    T.u_out_exact_vertex = zeros(0, 1);
+    T.delta_u_vertex_scalar = zeros(0, 1);
+    T.invalid_surface_normal_flag = false(0, 1);
     T.warning_level = strings(0, 1);
     T.note = strings(0, 1);
 end

@@ -102,6 +102,7 @@ The core data helper functions are:
 - `nparaxial_trace_segments_table_yu`
 - `nparaxial_plane_refraction_validity_yu`
 - `nparaxial_thinlens_validity_yu`
+- `nparaxial_surface_vertex_scalar_validity_yu`
 - `nparaxial_event_validity_yu`
 - `nparaxial_paraxial_validity_yu`
 - `nparaxial_matrix_chain_yu`
@@ -127,11 +128,10 @@ The Ray Diagram tab has a ray fan mode control:
 
 The aperture-limited fan means geometrically transmitted by the finite
 apertures in the prescription. It does not mean the ray is paraxial-valid.
-Milestone 2.3.3 includes propagation penalty, small-angle metrics,
-plane-refraction scalar diagnostics, and thin-lens angle/deflection
-diagnostics. Spherical-surface scalar validity remains deferred to Milestone
-2.3.4, and true spherical-surface intersection validity remains deferred to a
-later milestone.
+Milestones 2.3.3 and 2.3.4 include propagation penalty, small-angle metrics,
+plane-refraction scalar diagnostics, thin-lens angle/deflection diagnostics,
+and vertex-plane spherical-surface scalar diagnostics. True ray-sphere
+intersection validity remains deferred to Milestone 2.3.5.
 
 If the selected field is fully vignetted, the app does not generate an invalid
 `linspace` and reports that no transmitted aperture-limited ray fan exists. If
@@ -179,9 +179,34 @@ For thin lenses there is no unique exact Snell reference in this first-order
 model. The diagnostic reports `u_in`, paraxial deflection `-y/f`, `u_out`,
 and warning levels from angle/deflection magnitude only.
 
-Finite-radius spherical-surface scalar validity diagnostics are deferred to
-Milestone 2.3.4. Current finite-radius surface rows report
-`spherical_surface_deferred` and do not claim an exact spherical Snell result.
+For a finite-radius spherical refracting surface, Milestone 2.3.4 adds a
+vertex-plane scalar diagnostic. It uses the paraxial event height at the
+surface vertex plane and the local spherical-normal angle
+
+```text
+alpha = -asin(y/R)
+alpha_p = -y/R
+i = u_in - alpha
+snell_arg = (n1/n2)*sin(i)
+u_out_exact_vertex = alpha + asin(snell_arg)
+delta_u_vertex_scalar = u_out_exact_vertex - u_out_paraxial
+```
+
+The minus sign in `alpha = -asin(y/R)` is intentional. In the small-angle
+limit:
+
+```text
+u_out_exact_vertex ~= alpha + (n1/n2)*(u_in - alpha)
+                   = (n1/n2)*u_in + ((n1-n2)/(n2*R))*y
+```
+
+which reduces to the existing paraxial surface matrix. If `abs(y/R) > 1 +
+tol`, the diagnostic reports an invalid vertex-plane surface normal. If the
+Snell argument exceeds `1 + tol`, it reports TIR. Near-boundary asin arguments
+within tolerance may be clamped for numerical robustness. This diagnostic is
+not true exact spherical ray tracing: it does not intersect the ray with the
+sphere, does not move the event plane, and does not alter the paraxial trace.
+True ray-sphere intersection validity remains deferred to Milestone 2.3.5.
 
 ## First-Order Diagnostics
 
@@ -364,7 +389,7 @@ after-event slope and medium index.
 - Paraxial first-order model only.
 - Meridional y-z plane only.
 - No exact Snell tracing in the main trace engine.
-- No finite-radius spherical-surface scalar validity diagnostic yet.
+- Finite-radius spherical surfaces use a vertex-plane scalar diagnostic, not true ray-sphere intersection.
 - No aberration calculation.
 - No Seidel aberration diagnostics.
 - No support yet for final image planes before the last enabled element.
