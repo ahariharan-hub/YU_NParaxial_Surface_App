@@ -243,9 +243,18 @@ delta_u_exact_hit_vs_paraxial = u_out_exact_hit - u_out_paraxial
 delta_u_hit_vs_vertex = u_out_exact_hit - u_out_exact_vertex
 ```
 
+In validity event tables, `delta_u` is the primary diagnostic angle delta
+for the row's `diagnostic_type`. For finite-radius spherical surface rows,
+use the explicit columns `delta_u_vertex_scalar` and
+`delta_u_exact_hit_vs_paraxial` when comparing vertex-plane and local
+true-intersection diagnostics.
+
 This is not a full exact ray trace. The exact hit point and exact output angle
 are not propagated downstream, and aperture clipping remains the paraxial
 vertex-plane clipping used by the main trace.
+
+Large-hit-offset and large-delta warnings are diagnostic heuristics, not
+physical pass/fail acceptance criteria.
 
 ## First-Order Diagnostics
 

@@ -129,8 +129,11 @@ function lines = append_paraxial_validity_local(lines, validity)
         "Milestone 2.3.5 includes local true-intersection diagnostics for finite-radius spherical surfaces."
         "The surface-normal convention is alpha = -asin(y/R)."
         "True-hit rows use alpha_hit = -asin(y_hit/R)."
+        "delta_u is the primary diagnostic angle delta for the row diagnostic_type."
+        "For spherical rows, use delta_u_vertex_scalar and delta_u_exact_hit_vs_paraxial for explicit comparisons."
         "Exact hit and exact output angle are not propagated downstream."
         "Aperture clipping remains paraxial vertex-plane clipping."
+        "Large-hit-offset and large-delta warnings are diagnostic heuristics, not physical pass/fail acceptance criteria."
         ];
     lines = append_section_local(lines, "Paraxial validity diagnostics", text);
     lines = append_table_local(lines, "Paraxial validity thresholds", ...
