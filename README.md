@@ -150,6 +150,14 @@ plane-refraction scalar diagnostics, thin-lens angle/deflection diagnostics,
 vertex-plane spherical-surface scalar diagnostics, and local true-intersection
 spherical diagnostics.
 
+Milestone 2.4.4 adds a Paraxial Validity field-sweep plot. The sweep traces
+the existing paraxial ray fan at each selected field height, reduces the
+existing paraxial-validity diagnostics to one row per field, and plots a
+selected metric versus field height. Aperture-limited sweeps compute the
+vignetting interval separately at each field point. This plot is
+diagnostic-only and does not change tracing, aperture clipping, matrices,
+image solve, reports, or exact-hit diagnostic state.
+
 If the selected field is fully vignetted, the app does not generate an invalid
 `linspace` and reports that no transmitted aperture-limited ray fan exists. If
 the admitted interval is unbounded or semi-infinite, the app falls back to the

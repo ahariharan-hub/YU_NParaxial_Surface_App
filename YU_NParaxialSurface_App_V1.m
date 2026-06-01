@@ -36,6 +36,14 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         SurfaceCurvesCheckBox matlab.ui.control.CheckBox
         FirstSegmentPenaltyCheckBox matlab.ui.control.CheckBox
         SurfaceAngleSchematicCheckBox matlab.ui.control.CheckBox
+        ValiditySweepModeDropdown matlab.ui.control.DropDown
+        ValiditySweepFieldMinField matlab.ui.control.NumericEditField
+        ValiditySweepFieldMaxField matlab.ui.control.NumericEditField
+        ValiditySweepCountField matlab.ui.control.NumericEditField
+        ValiditySweepMetricDropdown matlab.ui.control.DropDown
+        ValiditySweepStatusLabel matlab.ui.control.Label
+        ValiditySweepAxes matlab.ui.control.UIAxes
+        ValiditySweepTable matlab.ui.control.Table
 
         RayAxes matlab.ui.control.UIAxes
         SummaryTextArea matlab.ui.control.TextArea
@@ -427,8 +435,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.VignettingCumulativeTable.Layout.Column = 1;
 
             validityTab = uitab(app.TabGroup, 'Title', 'Paraxial Validity');
-            validityGrid = uigridlayout(validityTab, [7 1]);
-            validityGrid.RowHeight = {110, 22, 120, 22, '1x', 22, '1x'};
+            validityGrid = uigridlayout(validityTab, [3 1]);
+            validityGrid.RowHeight = {110, 92, '1x'};
             validityGrid.Padding = [8 8 8 8];
             validityGrid.RowSpacing = 8;
             app.ValidityTextArea = uitextarea(validityGrid, ...
@@ -437,32 +445,153 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.ValidityTextArea.Layout.Row = 1;
             app.ValidityTextArea.Layout.Column = 1;
 
-            validitySummaryLabel = uilabel(validityGrid, ...
+            sweepControlsGrid = uigridlayout(validityGrid, [2 8]);
+            sweepControlsGrid.Layout.Row = 2;
+            sweepControlsGrid.Layout.Column = 1;
+            sweepControlsGrid.RowHeight = {26, 30};
+            sweepControlsGrid.ColumnWidth = {92, 120, 66, 72, 66, 72, 112, '1x'};
+            sweepControlsGrid.Padding = [0 0 0 0];
+            sweepControlsGrid.RowSpacing = 4;
+            sweepControlsGrid.ColumnSpacing = 6;
+
+            sweepModeLabel = uilabel(sweepControlsGrid, ...
+                'Text', 'Sweep mode', ...
+                'HorizontalAlignment', 'left');
+            sweepModeLabel.Layout.Row = 1;
+            sweepModeLabel.Layout.Column = 1;
+            app.ValiditySweepModeDropdown = uidropdown(sweepControlsGrid, ...
+                'Items', {'Current field only', 'Symmetric field sweep', ...
+                'Custom min/max field sweep'}, ...
+                'Value', 'Symmetric field sweep', ...
+                'ValueChangedFcn', @(~, ~) app.noteValiditySweepControlsChanged());
+            app.ValiditySweepModeDropdown.Layout.Row = 1;
+            app.ValiditySweepModeDropdown.Layout.Column = 2;
+
+            fieldMinLabel = uilabel(sweepControlsGrid, ...
+                'Text', 'Field min', ...
+                'HorizontalAlignment', 'left');
+            fieldMinLabel.Layout.Row = 1;
+            fieldMinLabel.Layout.Column = 3;
+            app.ValiditySweepFieldMinField = uieditfield(sweepControlsGrid, ...
+                'numeric', ...
+                'Value', -10, ...
+                'ValueChangedFcn', @(~, ~) app.noteValiditySweepControlsChanged());
+            app.ValiditySweepFieldMinField.Layout.Row = 1;
+            app.ValiditySweepFieldMinField.Layout.Column = 4;
+
+            fieldMaxLabel = uilabel(sweepControlsGrid, ...
+                'Text', 'Field max', ...
+                'HorizontalAlignment', 'left');
+            fieldMaxLabel.Layout.Row = 1;
+            fieldMaxLabel.Layout.Column = 5;
+            app.ValiditySweepFieldMaxField = uieditfield(sweepControlsGrid, ...
+                'numeric', ...
+                'Value', 10, ...
+                'ValueChangedFcn', @(~, ~) app.noteValiditySweepControlsChanged());
+            app.ValiditySweepFieldMaxField.Layout.Row = 1;
+            app.ValiditySweepFieldMaxField.Layout.Column = 6;
+
+            fieldCountLabel = uilabel(sweepControlsGrid, ...
+                'Text', 'Field points', ...
+                'HorizontalAlignment', 'left');
+            fieldCountLabel.Layout.Row = 1;
+            fieldCountLabel.Layout.Column = 7;
+            app.ValiditySweepCountField = uieditfield(sweepControlsGrid, ...
+                'numeric', ...
+                'Limits', [1 Inf], ...
+                'RoundFractionalValues', 'on', ...
+                'Value', 11, ...
+                'ValueChangedFcn', @(~, ~) app.noteValiditySweepControlsChanged());
+            app.ValiditySweepCountField.Layout.Row = 1;
+            app.ValiditySweepCountField.Layout.Column = 8;
+
+            metricLabel = uilabel(sweepControlsGrid, ...
+                'Text', 'Metric', ...
+                'HorizontalAlignment', 'left');
+            metricLabel.Layout.Row = 2;
+            metricLabel.Layout.Column = 1;
+            app.ValiditySweepMetricDropdown = uidropdown(sweepControlsGrid, ...
+                'Items', { ...
+                'worst_angle_deg', ...
+                'max_abs_translation_delta_y', ...
+                'worst_translation_delta_y', ...
+                'worst_plane_refraction_delta_u', ...
+                'worst_surface_vertex_delta_u', ...
+                'worst_true_intersection_delta_u', ...
+                'max_thinlens_deflection', ...
+                'notice_count', ...
+                'warning_count', ...
+                'severe_count', ...
+                'tir_count', ...
+                'invalid_normal_count'}, ...
+                'Value', 'max_abs_translation_delta_y', ...
+                'ValueChangedFcn', @(~, ~) app.refreshValiditySweepPlot());
+            app.ValiditySweepMetricDropdown.Layout.Row = 2;
+            app.ValiditySweepMetricDropdown.Layout.Column = [2 4];
+
+            updateSweepButton = uibutton(sweepControlsGrid, 'push', ...
+                'Text', 'Update Validity Plot', ...
+                'ButtonPushedFcn', @(~, ~) app.updateValidityFieldSweep());
+            updateSweepButton.Layout.Row = 2;
+            updateSweepButton.Layout.Column = [5 6];
+            exportSweepButton = uibutton(sweepControlsGrid, 'push', ...
+                'Text', 'Export Field Sweep CSV', ...
+                'ButtonPushedFcn', @(~, ~) app.exportValidityFieldSweepCsv());
+            exportSweepButton.Layout.Row = 2;
+            exportSweepButton.Layout.Column = [7 8];
+
+            validityTabs = uitabgroup(validityGrid);
+            validityTabs.Layout.Row = 3;
+            validityTabs.Layout.Column = 1;
+            validityTablesTab = uitab(validityTabs, 'Title', 'Summary / Tables');
+            validityTablesGrid = uigridlayout(validityTablesTab, [6 1]);
+            validityTablesGrid.RowHeight = {22, 120, 22, '1x', 22, '1x'};
+            validityTablesGrid.Padding = [8 8 8 8];
+            validityTablesGrid.RowSpacing = 8;
+
+            validitySummaryLabel = uilabel(validityTablesGrid, ...
                 'Text', 'Ray warning summary', ...
                 'FontWeight', 'bold');
-            validitySummaryLabel.Layout.Row = 2;
+            validitySummaryLabel.Layout.Row = 1;
             validitySummaryLabel.Layout.Column = 1;
-            app.ValiditySummaryTable = uitable(validityGrid);
-            app.ValiditySummaryTable.Layout.Row = 3;
+            app.ValiditySummaryTable = uitable(validityTablesGrid);
+            app.ValiditySummaryTable.Layout.Row = 2;
             app.ValiditySummaryTable.Layout.Column = 1;
 
-            validitySegmentLabel = uilabel(validityGrid, ...
+            validitySegmentLabel = uilabel(validityTablesGrid, ...
                 'Text', 'Segment translation and small-angle metrics', ...
                 'FontWeight', 'bold');
-            validitySegmentLabel.Layout.Row = 4;
+            validitySegmentLabel.Layout.Row = 3;
             validitySegmentLabel.Layout.Column = 1;
-            app.ValiditySegmentTable = uitable(validityGrid);
-            app.ValiditySegmentTable.Layout.Row = 5;
+            app.ValiditySegmentTable = uitable(validityTablesGrid);
+            app.ValiditySegmentTable.Layout.Row = 4;
             app.ValiditySegmentTable.Layout.Column = 1;
 
-            validityEventLabel = uilabel(validityGrid, ...
+            validityEventLabel = uilabel(validityTablesGrid, ...
                 'Text', 'Event validity diagnostics', ...
                 'FontWeight', 'bold');
-            validityEventLabel.Layout.Row = 6;
+            validityEventLabel.Layout.Row = 5;
             validityEventLabel.Layout.Column = 1;
-            app.ValidityEventTable = uitable(validityGrid);
-            app.ValidityEventTable.Layout.Row = 7;
+            app.ValidityEventTable = uitable(validityTablesGrid);
+            app.ValidityEventTable.Layout.Row = 6;
             app.ValidityEventTable.Layout.Column = 1;
+
+            validityPlotTab = uitab(validityTabs, 'Title', 'Field Sweep Plot');
+            validityPlotGrid = uigridlayout(validityPlotTab, [3 1]);
+            validityPlotGrid.RowHeight = {24, '1x', 130};
+            validityPlotGrid.Padding = [8 8 8 8];
+            validityPlotGrid.RowSpacing = 8;
+            app.ValiditySweepStatusLabel = uilabel(validityPlotGrid, ...
+                'Text', 'Run Trace, then Update Validity Plot.', ...
+                'FontColor', [0.2 0.42 0.2]);
+            app.ValiditySweepStatusLabel.Layout.Row = 1;
+            app.ValiditySweepStatusLabel.Layout.Column = 1;
+            app.ValiditySweepAxes = uiaxes(validityPlotGrid);
+            app.ValiditySweepAxes.Layout.Row = 2;
+            app.ValiditySweepAxes.Layout.Column = 1;
+            app.ValiditySweepTable = uitable(validityPlotGrid);
+            app.ValiditySweepTable.Layout.Row = 3;
+            app.ValiditySweepTable.Layout.Column = 1;
 
             chiefTab = uitab(app.TabGroup, 'Title', 'Chief / Marginal Rays');
             chiefGrid = uigridlayout(chiefTab, [3 1]);
@@ -706,6 +835,9 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   The first-segment penalty overlay compares y + d*u with y + d*tan(u).'
                 '   Surface-angle schematics show u and incidence theta in degrees.'
                 '   These graphical overlays do not affect tracing, clipping, matrices, image solve, or reports.'
+                '   The Paraxial Validity tab can sweep field height and plot a selected validity metric.'
+                '   Aperture-limited sweeps use the vignetting interval at each field point.'
+                '   Field-sweep plotting is diagnostic-only and does not change optical calculations.'
                 '   Milestones 2.3.3-2.3.5 include propagation penalty, small-angle metrics,'
                 '   plane-refraction scalar diagnostics, thin-lens angle/deflection diagnostics,'
                 '   vertex-plane spherical diagnostics, and local true-intersection diagnostics.'
@@ -1074,6 +1206,28 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
         end
 
+        function exportValidityFieldSweepCsv(app)
+            try
+                if ~app.hasTraceData("Run Trace before exporting validity field sweep.")
+                    return
+                end
+                if ~isfield(app.Data, 'validityFieldSweep') || ...
+                        isempty(app.Data.validityFieldSweep) || ...
+                        ~isfield(app.Data.validityFieldSweep, 'sweep_summary_table')
+                    app.setStatus("Update Validity Plot before exporting field sweep.", true);
+                    return
+                end
+                app.exportTableCsvWithDialog( ...
+                    app.Data.validityFieldSweep.sweep_summary_table, ...
+                    'nparaxial_validity_field_sweep.csv', ...
+                    'Export Field Sweep CSV', ...
+                    'Exported validity field sweep CSV');
+            catch ME
+                app.setStatus("Export validity field sweep error: " + ...
+                    string(ME.message), true);
+            end
+        end
+
         function exportCombinedFirstOrderReportTxt(app)
             try
                 if ~app.hasTraceData("Run Trace before exporting the first-order report.")
@@ -1246,6 +1400,20 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
             if ~isempty(app.ValidityEventTable) && isvalid(app.ValidityEventTable)
                 app.ValidityEventTable.Data = table();
+            end
+            if ~isempty(app.ValiditySweepAxes) && isvalid(app.ValiditySweepAxes)
+                cla(app.ValiditySweepAxes);
+                title(app.ValiditySweepAxes, 'Run Trace before field sweep');
+                xlabel(app.ValiditySweepAxes, 'Field height y_{field}');
+                ylabel(app.ValiditySweepAxes, 'metric');
+            end
+            if ~isempty(app.ValiditySweepTable) && isvalid(app.ValiditySweepTable)
+                app.ValiditySweepTable.Data = table();
+            end
+            if ~isempty(app.ValiditySweepStatusLabel) && ...
+                    isvalid(app.ValiditySweepStatusLabel)
+                app.ValiditySweepStatusLabel.Text = ...
+                    'Run Trace before updating validity field sweep.';
             end
             if ~isempty(app.ChiefTextArea) && isvalid(app.ChiefTextArea)
                 app.ChiefTextArea.Value = staleText;
@@ -2597,6 +2765,132 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.ValiditySummaryTable.Data = validity.summary_table;
             app.ValiditySegmentTable.Data = validity.segment_table;
             app.ValidityEventTable.Data = validity.event_table;
+            if isfield(app.Data, 'validityFieldSweep') && ...
+                    ~isempty(app.Data.validityFieldSweep)
+                app.ValiditySweepTable.Data = ...
+                    app.Data.validityFieldSweep.sweep_summary_table;
+                app.refreshValiditySweepPlot();
+            end
+        end
+
+        function noteValiditySweepControlsChanged(app)
+            app.setValiditySweepStatus( ...
+                "Field sweep controls changed. Press Update Validity Plot.", false);
+        end
+
+        function updateValidityFieldSweep(app)
+            try
+                if ~app.hasTraceData("Run Trace before updating validity field-sweep plot.")
+                    return
+                end
+
+                fieldHeights = app.validitySweepFieldHeights();
+                rayFanSettings = struct();
+                rayFanSettings.mode = string(app.RayFanModeDropdown.Value);
+                rayFanSettings.n_rays = round(app.RayCountField.Value);
+                rayFanSettings.manual_u_max = app.ManualUMaxField.Value;
+                validitySettings = struct('z_final', app.Data.img.z_img);
+
+                app.setValiditySweepStatus("Computing validity field sweep...", false);
+                drawnow limitrate
+
+                sweep = nparaxial_validity_field_sweep_yu( ...
+                    app.Data.prescription, app.Data.params.z_obj, ...
+                    fieldHeights, rayFanSettings, validitySettings, 1e-12);
+                app.Data.validityFieldSweep = sweep;
+                app.ValiditySweepTable.Data = sweep.sweep_summary_table;
+                app.refreshValiditySweepPlot();
+                app.setStatus("Updated paraxial-validity field sweep.", false);
+            catch ME
+                app.setValiditySweepStatus("Field sweep error: " + string(ME.message), true);
+                app.setStatus("Field sweep error: " + string(ME.message), true);
+            end
+        end
+
+        function fields = validitySweepFieldHeights(app)
+            mode = string(app.ValiditySweepModeDropdown.Value);
+            n = max(1, round(app.ValiditySweepCountField.Value));
+            app.ValiditySweepCountField.Value = n;
+
+            switch mode
+                case "Current field only"
+                    fields = app.DiagnosticFieldField.Value;
+                case "Symmetric field sweep"
+                    extent = max(abs([app.DiagnosticFieldField.Value, ...
+                        app.FieldMinField.Value, app.FieldMaxField.Value]));
+                    if ~isfinite(extent) || extent <= 0
+                        extent = 10;
+                    end
+                    app.ValiditySweepFieldMinField.Value = -extent;
+                    app.ValiditySweepFieldMaxField.Value = extent;
+                    fields = linspace(-extent, extent, n);
+                otherwise
+                    yMin = app.ValiditySweepFieldMinField.Value;
+                    yMax = app.ValiditySweepFieldMaxField.Value;
+                    if ~isfinite(yMin) || ~isfinite(yMax)
+                        error('Field sweep min and max must be finite.');
+                    end
+                    if yMin > yMax
+                        error('Field sweep min must be <= field sweep max.');
+                    end
+                    fields = linspace(yMin, yMax, n);
+            end
+            fields = fields(:);
+        end
+
+        function refreshValiditySweepPlot(app)
+            if isempty(app.ValiditySweepAxes) || ~isvalid(app.ValiditySweepAxes)
+                return
+            end
+            cla(app.ValiditySweepAxes);
+            grid(app.ValiditySweepAxes, 'on');
+            box(app.ValiditySweepAxes, 'on');
+            xlabel(app.ValiditySweepAxes, 'Field height y_{field}');
+            metric = string(app.ValiditySweepMetricDropdown.Value);
+            ylabel(app.ValiditySweepAxes, char(metric), 'Interpreter', 'none');
+            title(app.ValiditySweepAxes, 'Paraxial validity field sweep');
+
+            if isempty(app.Data) || ~isfield(app.Data, 'validityFieldSweep') || ...
+                    isempty(app.Data.validityFieldSweep)
+                app.setValiditySweepStatus( ...
+                    "Press Update Validity Plot to compute a field sweep.", false);
+                return
+            end
+
+            T = app.Data.validityFieldSweep.sweep_summary_table;
+            [y, metricStatus] = nparaxial_validity_field_sweep_metric_yu(T, metric);
+            if metricStatus ~= "Metric available."
+                app.ValiditySweepTable.Data = T;
+                app.setValiditySweepStatus(metricStatus, true);
+                return
+            end
+
+            x = T.y_field;
+            plot(app.ValiditySweepAxes, x, y, '-o', ...
+                'LineWidth', 1.2, ...
+                'MarkerSize', 5);
+            app.ValiditySweepTable.Data = T;
+
+            if all(~isfinite(y))
+                app.setValiditySweepStatus( ...
+                    "All values for selected field-sweep metric are NaN or unavailable.", true);
+            else
+                app.setValiditySweepStatus( ...
+                    "Field sweep plotted: " + metric + " versus field height.", false);
+            end
+        end
+
+        function setValiditySweepStatus(app, message, isError)
+            if isempty(app.ValiditySweepStatusLabel) || ...
+                    ~isvalid(app.ValiditySweepStatusLabel)
+                return
+            end
+            app.ValiditySweepStatusLabel.Text = char(message);
+            if isError
+                app.ValiditySweepStatusLabel.FontColor = [0.72 0.12 0.12];
+            else
+                app.ValiditySweepStatusLabel.FontColor = [0.2 0.42 0.2];
+            end
         end
 
         function updateChiefMarginalDiagnostics(app)
