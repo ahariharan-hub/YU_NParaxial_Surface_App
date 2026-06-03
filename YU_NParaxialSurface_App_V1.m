@@ -2293,6 +2293,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             data = app.Data;
             yVals = [];
             zVals = [data.params.z_obj; data.enabledElements.z; data.img.z_img];
+            legendHandles = gobjects(0, 1);
+            legendNames = strings(0, 1);
 
             for q = 1:numel(data.bundleSet)
                 bundle = data.bundleSet(q).bundle;
@@ -2310,19 +2312,24 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                         if numel(zSeg) < 2 || numel(ySeg) < 2
                             continue
                         end
-                        plot(ax, zSeg, ySeg, ...
+                        hRay = plot(ax, zSeg, ySeg, ...
                             'Color', color, ...
                             'LineWidth', width, ...
                             'LineStyle', style, ...
                             'DisplayName', displayName);
+                        legendHandles(end+1, 1) = hRay; %#ok<AGROW>
+                        legendNames(end+1, 1) = string(displayName); %#ok<AGROW>
                         yVals = [yVals; ySeg(:)]; %#ok<AGROW>
                         zVals = [zVals; zSeg(:)]; %#ok<AGROW>
                     end
                     if ~bundle(r).trc && isfinite(res.blocked_at_z)
-                        plot(ax, res.blocked_at_z, res.blocked_y, marker, ...
+                        hClip = plot(ax, res.blocked_at_z, res.blocked_y, marker, ...
                             'Color', color, ...
                             'LineWidth', 1.5, ...
-                            'MarkerSize', 7);
+                            'MarkerSize', 7, ...
+                            'DisplayName', 'Clipped ray');
+                        legendHandles(end+1, 1) = hClip; %#ok<AGROW>
+                        legendNames(end+1, 1) = "Clipped ray"; %#ok<AGROW>
                     end
                 end
             end
@@ -2390,6 +2397,15 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             xlabel(ax, 'z');
             ylabel(ax, 'y');
             title(ax, "N-element paraxial ray trace - " + data.rayFanLabel);
+            [legendHandles, legendNames] = nparaxial_legend_unique_yu( ...
+                legendHandles, legendNames);
+            if isempty(legendHandles)
+                legend(ax, 'off');
+            else
+                lgd = legend(ax, legendHandles, cellstr(legendNames), ...
+                    'Location', 'best');
+                lgd.Interpreter = 'none';
+            end
             hold(ax, 'off');
         end
 
