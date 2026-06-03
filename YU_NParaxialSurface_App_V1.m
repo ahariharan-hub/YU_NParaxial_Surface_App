@@ -2296,26 +2296,31 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
             for q = 1:numel(data.bundleSet)
                 bundle = data.bundleSet(q).bundle;
+                rayStyles = app.rayStylesForBundle(data.bundleSet(q));
                 for r = 1:numel(bundle)
                     res = bundle(r).res;
+                    color = rayStyles.color(r, :);
+                    width = rayStyles.line_width(r);
+                    style = char(rayStyles.line_style(r));
+                    displayName = char(rayStyles.display_name(r));
+                    marker = char(rayStyles.marker(r));
                     for s = 1:numel(res.seg_z)
                         zSeg = res.seg_z{s};
                         ySeg = res.seg_y{s};
                         if numel(zSeg) < 2 || numel(ySeg) < 2
                             continue
                         end
-                        [color, width, style] = app.rayStyle( ...
-                            bundle(r).name, ~bundle(r).trc);
                         plot(ax, zSeg, ySeg, ...
                             'Color', color, ...
                             'LineWidth', width, ...
-                            'LineStyle', style);
+                            'LineStyle', style, ...
+                            'DisplayName', displayName);
                         yVals = [yVals; ySeg(:)]; %#ok<AGROW>
                         zVals = [zVals; zSeg(:)]; %#ok<AGROW>
                     end
                     if ~bundle(r).trc && isfinite(res.blocked_at_z)
-                        plot(ax, res.blocked_at_z, res.blocked_y, 'x', ...
-                            'Color', [0.75 0.1 0.1], ...
+                        plot(ax, res.blocked_at_z, res.blocked_y, marker, ...
+                            'Color', color, ...
                             'LineWidth', 1.5, ...
                             'MarkerSize', 7);
                     end
@@ -2555,27 +2560,38 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 app.SurfaceAngleSchematicCheckBox.Value;
         end
 
-        function [color, width, style] = rayStyle(~, rayName, isBlocked)
-            rayName = string(rayName);
-            width = 0.8;
-            style = '-';
-            color = [0.56 0.56 0.56];
-
-            if contains(rayName, "chief")
-                color = [0.82 0.12 0.12];
-                width = 1.4;
-            elseif contains(rayName, "upper_marginal")
-                color = [0.12 0.34 0.75];
-                width = 1.2;
-            elseif contains(rayName, "lower_marginal")
-                color = [0.12 0.58 0.22];
-                width = 1.2;
+        function styles = rayStylesForBundle(~, bundleSetItem)
+            bundle = bundleSetItem.bundle;
+            nRays = numel(bundle);
+            if nRays == 0
+                styles = table( ...
+                    strings(0, 1), zeros(0, 3), strings(0, 1), ...
+                    strings(0, 1), strings(0, 1), zeros(0, 1), ...
+                    'VariableNames', {'role', 'color', 'line_style', ...
+                    'display_name', 'marker', 'line_width'});
+                return
             end
 
-            if isBlocked
-                style = '--';
-                width = width + 0.2;
+            clipped = ~[bundle.trc].';
+            if isfield(bundleSetItem, 'rays') && istable(bundleSetItem.rays) && ...
+                    height(bundleSetItem.rays) == nRays
+                styles = nparaxial_ray_role_style_yu( ...
+                    bundleSetItem.rays, clipped);
+                return
             end
+
+            rayNames = strings(nRays, 1);
+            for k = 1:nRays
+                rayNames(k) = string(bundle(k).name);
+            end
+            rayTable = table(rayNames, 'VariableNames', {'name'});
+            styles = nparaxial_ray_role_style_yu(rayTable, clipped);
+        end
+
+        function [color, width, style, displayName, marker] = ...
+                rayStyle(~, rayInfo, isBlocked)
+            [color, style, displayName, marker, width] = ...
+                nparaxial_ray_role_style_yu(rayInfo, isBlocked);
         end
 
         function updateSummary(app)
