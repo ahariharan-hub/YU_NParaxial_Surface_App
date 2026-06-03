@@ -10,6 +10,7 @@ function result = demo_nparaxial_default_prescriptions_yu()
         "Two thin lenses"
         "Two-surface thick lens"
         "Stop clipping demo"
+        "Homogeneous translation / free-space propagation"
     ];
 
     rowCounts = zeros(numel(presetNames), 1);
