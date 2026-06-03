@@ -27,8 +27,26 @@ function lines = nparaxial_combined_report_yu( ...
     lines = add_line_local(lines, "-----------");
     lines = add_line_local(lines, sprintf("z_object = %.12g", img.z_obj));
     lines = add_line_local(lines, sprintf("z_reference = %.12g", img.z_ref));
-    lines = add_line_local(lines, sprintf("z_image = %.12g", img.z_img));
-    lines = add_line_local(lines, sprintf("x_after_reference = %.12g", img.x_after_ref));
+    if isfield(img, 'trace_z_final')
+        lines = add_line_local(lines, sprintf( ...
+            "trace_z_final = %.12g", img.trace_z_final));
+    end
+    if isfield(img, 'type')
+        lines = add_line_local(lines, "image_type = " + string(img.type));
+    end
+    if isfield(img, 'is_finite') && ~img.is_finite
+        lines = add_line_local(lines, "z_image = not finite");
+        lines = add_line_local(lines, "x_after_reference = not finite");
+    else
+        lines = add_line_local(lines, sprintf("z_image = %.12g", img.z_img));
+        lines = add_line_local(lines, sprintf( ...
+            "x_after_reference = %.12g", img.x_after_ref));
+    end
+    if isfield(img, 'message')
+        lines = add_line_local(lines, "image_solve_note = " + string(img.message));
+    elseif isfield(img, 'note')
+        lines = add_line_local(lines, "image_solve_note = " + string(img.note));
+    end
     lines = add_line_local(lines, sprintf("magnification = %.12g", img.m));
     lines = add_line_local(lines, sprintf("B_residual = %.12g", img.B_residual));
     lines = add_line_local(lines, "");

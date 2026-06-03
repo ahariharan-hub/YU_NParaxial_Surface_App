@@ -1,8 +1,14 @@
-function img = nparaxial_solve_image_plane_yu(prescription, z_obj)
+function img = nparaxial_solve_image_plane_yu(prescription, z_obj, tol)
 %NPARAXIAL_SOLVE_IMAGE_PLANE_YU Solve finite image plane by B + x*D = 0.
 
+    if nargin < 3 || isempty(tol)
+        tol = 1e-12;
+    end
     if ~isscalar(z_obj) || ~isfinite(z_obj)
         error('z_obj must be a finite scalar.');
+    end
+    if ~isscalar(tol) || ~isfinite(tol) || tol <= 0
+        error('tol must be a positive finite scalar.');
     end
 
     elements = nparaxial_enabled_elements_yu(prescription);
@@ -30,8 +36,20 @@ function img = nparaxial_solve_image_plane_yu(prescription, z_obj)
     img.C_ref = C;
     img.D_ref = D;
     img.isFinite = false;
+    img.isReal = false;
+    img.isVirtual = false;
+    img.isAtInfinity = true;
+    img.is_finite = false;
+    img.is_real = false;
+    img.is_virtual = false;
+    img.is_at_infinity = true;
+    img.type = "image at infinity / no finite image";
+    img.image_type = img.type;
     img.x_after_ref = Inf;
+    img.x_from_reference = Inf;
     img.z_img = Inf;
+    img.z_image = Inf;
+    img.trace_z_final = z_ref;
     img.M_img = NaN(2, 2);
     img.A_img = NaN;
     img.B_img = NaN;
@@ -40,19 +58,31 @@ function img = nparaxial_solve_image_plane_yu(prescription, z_obj)
     img.m = NaN;
     img.B_residual = NaN;
 
-    if abs(D) < 1e-12
-        img.note = 'No finite image plane found because D is approximately zero.';
+    cls = nparaxial_classify_image_plane_yu(M_ref, z_ref, tol);
+    img.type = cls.type;
+    img.image_type = cls.type;
+    img.is_finite = cls.is_finite;
+    img.is_real = cls.is_real;
+    img.is_virtual = cls.is_virtual;
+    img.is_at_infinity = cls.is_at_infinity;
+    img.isFinite = cls.is_finite;
+    img.isReal = cls.is_real;
+    img.isVirtual = cls.is_virtual;
+    img.isAtInfinity = cls.is_at_infinity;
+    img.x_after_ref = cls.x_from_reference;
+    img.x_from_reference = cls.x_from_reference;
+    img.z_img = cls.z_image;
+    img.z_image = cls.z_image;
+    img.note = char(cls.message);
+    img.message = cls.message;
+
+    if ~img.is_finite
         return
     end
 
-    x = -B / D;
-    z_img = z_ref + x;
-
-    T = [1, x; 0, 1];
+    T = [1, img.x_after_ref; 0, 1];
     M_img = T * M_ref;
 
-    img.x_after_ref = x;
-    img.z_img = z_img;
     img.M_img = M_img;
     img.A_img = M_img(1, 1);
     img.B_img = M_img(1, 2);
@@ -60,11 +90,10 @@ function img = nparaxial_solve_image_plane_yu(prescription, z_obj)
     img.D_img = M_img(2, 2);
     img.m = M_img(1, 1);
     img.B_residual = M_img(1, 2);
-    img.isFinite = isfinite(z_img);
 
-    if img.isFinite
-        img.note = 'Finite first-order image plane found.';
+    if img.is_real
+        img.trace_z_final = img.z_img;
     else
-        img.note = 'Image plane is not finite.';
+        img.trace_z_final = img.z_ref;
     end
 end
