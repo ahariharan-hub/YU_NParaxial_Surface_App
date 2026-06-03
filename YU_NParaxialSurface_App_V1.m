@@ -203,7 +203,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'Single thin lens', ...
                 'Two thin lenses', ...
                 'Two-surface thick lens', ...
-                'Stop clipping demo'}, ...
+                'Stop clipping demo', ...
+                'Homogeneous translation / free-space propagation'}, ...
                 'Value', 'Two thin lenses', ...
                 'ValueChangedFcn', @(~, ~) app.requestTrace());
             app.PresetDropdown.Layout.Row = 9;
@@ -815,7 +816,10 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 ''
                 '8. Presets and data handling'
                 '   Built-in presets are available for: single thin lens, two thin lenses,'
-                '   two-surface thick lens, and a stop clipping demo.'
+                '   two-surface thick lens, stop clipping, and homogeneous translation.'
+                '   The homogeneous translation preset is not an imaging system.'
+                '   It demonstrates y2 = y1 + L*u and u2 = u1 in a uniform medium.'
+                '   Its finite image report is a virtual back-intersection diagnostic.'
                 '   Prescriptions can be checked, saved, and loaded as CSV or MAT files.'
                 '   Ray result tables can be exported as CSV after a trace is run.'
                 '   The text summary can be exported after a trace is run.'
@@ -923,7 +927,11 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   z_ref is the last enabled element position.'
                 '   After translating by x: B_total = B + x*D.'
                 '   The image condition is B_total = 0, so x = -B/D.'
-                '   This milestone accepts only z_img >= z_ref.'
+                '   If abs(D) > tol and x >= 0, the image is finite real.'
+                '   If abs(D) > tol and x < 0, the image is finite virtual.'
+                '   Virtual images are reported by backward extension only;'
+                '   main ray tracing remains forward to the reference plane.'
+                '   If abs(D) <= tol, the image is at infinity / no finite image.'
                 ''
                 '16. Current limitations'
                 '   Paraxial first-order model only.'
@@ -935,7 +943,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 '   No aberration calculation.'
                 '   No advanced pupil diagnostics.'
                 '   No full 3D pupil or field-of-view analysis.'
-                '   No support yet for final image planes before the last enabled element.'
+                '   Virtual image planes are diagnostic overlays, not backward traces.'
             };
         end
 
@@ -972,6 +980,10 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 prescription = nparaxial_default_prescription_yu( ...
                     app.PresetDropdown.Value);
                 app.PrescriptionTable.Data = table_to_prescription_yu(prescription);
+                if string(app.PresetDropdown.Value) == ...
+                        "Homogeneous translation / free-space propagation"
+                    app.ObjectZField.Value = 0;
+                end
                 app.SelectedPrescriptionRows = [];
                 app.markDirty("Loaded default prescription: " + ...
                     string(app.PresetDropdown.Value) + ".");
@@ -1278,16 +1290,10 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 prescription = nparaxial_validate_prescription_yu(app.PrescriptionTable.Data);
                 img = nparaxial_solve_image_plane_yu(prescription, params.z_obj);
 
-                if ~img.isFinite
-                    error(img.note);
-                end
-                if img.z_img < img.z_ref - 1e-12
-                    error(['This milestone supports only final real image planes ', ...
-                        'after the last enabled element. Virtual/intermediate images ', ...
-                        'before the last enabled element are not supported yet.']);
-                end
-                if img.z_img <= params.z_obj
-                    error('Solved image plane is not after the object plane.');
+                if ~isfield(img, 'trace_z_final') || ...
+                        ~isfinite(img.trace_z_final) || ...
+                        img.trace_z_final < params.z_obj
+                    error('Forward diagnostic trace endpoint is unavailable.');
                 end
 
                 data = app.computeCase(params, prescription, img);
@@ -1310,6 +1316,14 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function message = traceStatusMessage(~, data)
             message = "Trace complete.";
+            if isfield(data, 'img') && isfield(data.img, 'type')
+                switch string(data.img.type)
+                    case "finite virtual image"
+                        message = "Trace complete. Finite virtual image reported by backward extension.";
+                    case "image at infinity / no finite image"
+                        message = "Trace complete. Image at infinity / no finite image.";
+                end
+            end
             if ~isfield(data, 'fieldTable') || isempty(data.fieldTable)
                 return
             end
@@ -1473,7 +1487,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function data = computeCase(app, params, prescription, img)
             yFields = app.buildFieldHeights(params);
-            primaryStop = app.findPrimaryStop(prescription, params.z_obj, img.z_img);
+            zTrace = app.traceEndpointZ(img);
+            primaryStop = app.findPrimaryStop(prescription, params.z_obj, zTrace);
 
             bundleSet = struct([]);
             field_index = zeros(numel(yFields), 1);
@@ -1502,7 +1517,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     rays.name = "field_" + string(q) + "_" + rays.name;
                     rays.ray_name = rays.name;
                     bundle = nparaxial_trace_bundle_yu( ...
-                        rays, prescription, img.z_img);
+                        rays, prescription, zTrace);
                 else
                     bundle = app.emptyTraceBundle();
                 end
@@ -1517,13 +1532,18 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
                 field_index(q) = q;
                 y_object(q) = yObj;
-                y_image_predicted(q) = img.m * yObj;
                 y_image_measured(q) = diag.mean_yf;
-                image_error(q) = diag.mean_yf - img.m*yObj;
                 max_ray_spread(q) = diag.max_abs_delta_yf;
                 rms_ray_spread(q) = diag.rms_delta_yf;
                 num_passed(q) = sum(diag.table.traced);
                 num_blocked(q) = sum(~diag.table.traced);
+                if app.hasFiniteRealImage(img)
+                    y_image_predicted(q) = img.m * yObj;
+                    image_error(q) = diag.mean_yf - img.m*yObj;
+                else
+                    y_image_predicted(q) = NaN;
+                    image_error(q) = NaN;
+                end
                 ray_fan_mode(q) = fanInfo.sampling_mode;
                 ray_fan_status(q) = fanInfo.status_text;
                 ray_fan_u_low(q) = fanInfo.used_u_low;
@@ -1555,7 +1575,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
             matrixTable = app.makeMatrixTable(img, params.z_obj);
             matrixChain = nparaxial_matrix_chain_yu( ...
-                prescription, params.z_obj, img.z_img);
+                prescription, params.z_obj, zTrace);
             summaryLines = app.makeSummaryLines( ...
                 params, prescription, img, primaryStop, fieldTable);
             diagnostics = app.computeFirstOrderDiagnostics( ...
@@ -1588,7 +1608,19 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function diagnostics = computeFirstOrderDiagnostics(~, params, prescription, img)
             diagnostics = nparaxial_field_diagnostics_yu( ...
-                prescription, params.z_obj, img.z_img, params.y_diag);
+                prescription, params.z_obj, img.trace_z_final, params.y_diag);
+        end
+
+        function zTrace = traceEndpointZ(~, img)
+            if isfield(img, 'trace_z_final') && isfinite(img.trace_z_final)
+                zTrace = img.trace_z_final;
+            else
+                zTrace = img.z_ref;
+            end
+        end
+
+        function tf = hasFiniteRealImage(~, img)
+            tf = isfield(img, 'is_real') && img.is_finite && img.is_real;
         end
 
         function yFields = buildFieldHeights(~, params)
@@ -1778,11 +1810,15 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         end
 
         function [rays, fanInfo] = makeRayFan(~, params, prescription, img, yObj)
+            zTrace = img.z_ref;
+            if isfield(img, 'trace_z_final') && isfinite(img.trace_z_final)
+                zTrace = img.trace_z_final;
+            end
             switch string(params.ray_fan_mode)
                 case "Aperture-limited admitted cone"
                     rays = nparaxial_make_aperture_limited_rays_yu( ...
                         prescription, params.z_obj, yObj, params.Nrays, ...
-                        params.manual_u_max, 1e-12, img.z_img);
+                        params.manual_u_max, 1e-12, zTrace);
                 otherwise
                     rays = nparaxial_make_manual_fan_rays_yu( ...
                         params.z_obj, yObj, params.Nrays, ...
@@ -2151,8 +2187,13 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             quantity = [
                 "z_object"
                 "z_reference"
+                "trace_z_final"
                 "z_image"
                 "x_after_reference"
+                "is_finite_image"
+                "is_real_image"
+                "is_virtual_image"
+                "is_at_infinity"
                 "A_ref"
                 "B_ref"
                 "C_ref"
@@ -2168,8 +2209,13 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             value = [
                 zObj
                 img.z_ref
+                img.trace_z_final
                 img.z_img
                 img.x_after_ref
+                double(img.is_finite)
+                double(img.is_real)
+                double(img.is_virtual)
+                double(img.is_at_infinity)
                 img.A_ref
                 img.B_ref
                 img.C_ref
@@ -2185,7 +2231,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             T = table(quantity, value);
         end
 
-        function lines = makeSummaryLines(~, params, prescription, img, primaryStop, fieldTable)
+        function lines = makeSummaryLines(app, params, prescription, img, primaryStop, fieldTable)
             elements = nparaxial_enabled_elements_yu(prescription);
             inputMedium = elements.n_before(1);
             outputMedium = elements.n_after(end);
@@ -2193,6 +2239,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             totalBlocked = sum(fieldTable.num_blocked);
             maxAbsError = max(abs(fieldTable.image_error), [], 'omitnan');
             maxSpread = max(fieldTable.max_ray_spread, [], 'omitnan');
+            imageType = app.imageTypeDisplayName(img);
+            imageLines = app.imageSummaryLines(img);
 
             lines = {
                 'N-element paraxial y-u summary'
@@ -2202,8 +2250,10 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 sprintf('Object-space/input n = %.6g', inputMedium)
                 sprintf('Image-space/output n = %.6g', outputMedium)
                 sprintf('Reference element z = %.6g', img.z_ref)
-                sprintf('Image plane z = %.6g', img.z_img)
-                sprintf('Distance after reference x = %.6g', img.x_after_ref)
+                sprintf('Forward trace endpoint z = %.6g', img.trace_z_final)
+                sprintf('Image classification = %s', imageType)
+                };
+            lines = [lines; imageLines(:); {
                 sprintf('Transverse magnification m = %.6g', img.m)
                 sprintf('B residual at image = %.3e', img.B_residual)
                 sprintf('Field heights = %.6g to %.6g', min(fieldTable.y_object), max(fieldTable.y_object))
@@ -2216,7 +2266,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 ''
                 'Ray fan sampling'
                 '----------------'
-            };
+            }];
 
             for q = 1:height(fieldTable)
                 lines{end+1, 1} = sprintf( ...
@@ -2251,6 +2301,39 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     'First finite standalone stop is "%s" at z = %.6g, radius = %.6g.', ...
                     primaryStop.element_id(1), primaryStop.z(1), ...
                     primaryStop.aperture_radius(1));
+            end
+        end
+
+        function name = imageTypeDisplayName(~, img)
+            switch string(img.type)
+                case "finite real image"
+                    name = "Finite real image";
+                case "finite virtual image"
+                    name = "Finite virtual image";
+                otherwise
+                    name = "Image at infinity / no finite image";
+            end
+        end
+
+        function lines = imageSummaryLines(app, img)
+            imageType = app.imageTypeDisplayName(img);
+            if img.is_finite
+                lines = {
+                    sprintf('Image plane z = %.6g', img.z_img)
+                    sprintf('Distance after reference x = %.6g', img.x_after_ref)
+                    char("Image solve note = " + string(img.message))
+                    };
+                if img.is_virtual
+                    lines{end+1, 1} = ...
+                        'Virtual image is found by backward extension from the final reference plane.';
+                end
+            else
+                lines = {
+                    sprintf('Image plane z = %s', 'not finite')
+                    sprintf('Distance after reference x = %s', 'not finite')
+                    char("Image solve note = " + string(img.message))
+                    char("Image type = " + imageType)
+                    };
             end
         end
 
@@ -2292,7 +2375,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
             data = app.Data;
             yVals = [];
-            zVals = [data.params.z_obj; data.enabledElements.z; data.img.z_img];
+            zVals = [data.params.z_obj; data.enabledElements.z; ...
+                data.img.trace_z_final];
             legendHandles = gobjects(0, 1);
             legendNames = strings(0, 1);
 
@@ -2372,11 +2456,14 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 app.drawElement(ax, element, yLim);
             end
 
-            plot(ax, [data.img.z_img, data.img.z_img], yLim, ...
-                ':', 'Color', [0.25 0.25 0.25], 'LineWidth', 1.2);
-            text(ax, data.img.z_img, yLim(2), ' image', ...
-                'VerticalAlignment', 'top', ...
-                'Color', [0.25 0.25 0.25]);
+            if data.img.is_finite && data.img.is_real
+                plot(ax, [data.img.z_img, data.img.z_img], yLim, ...
+                    ':', 'Color', [0.25 0.25 0.25], 'LineWidth', 1.2);
+                text(ax, data.img.z_img, yLim(2), ' image', ...
+                    'VerticalAlignment', 'top', ...
+                    'Color', [0.25 0.25 0.25]);
+                zVals = [zVals; data.img.z_img]; %#ok<AGROW>
+            end
 
             xMin = min(zVals);
             xMax = max(zVals);
@@ -2385,7 +2472,17 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 xMax = xMax + 1;
             end
             xPad = 0.04*(xMax - xMin);
-            xlim(ax, [xMin - xPad, xMax + xPad]);
+            xLimits = [xMin - xPad, xMax + xPad];
+            xlim(ax, xLimits);
+
+            if data.img.is_finite && data.img.is_virtual && ...
+                    data.img.z_img >= xLimits(1) && data.img.z_img <= xLimits(2)
+                plot(ax, [data.img.z_img, data.img.z_img], yLim, ...
+                    '--', 'Color', [0.45 0.25 0.65], 'LineWidth', 1.2);
+                text(ax, data.img.z_img, yLim(2), ' Virtual image', ...
+                    'VerticalAlignment', 'top', ...
+                    'Color', [0.45 0.25 0.65]);
+            end
 
             if app.firstSegmentPenaltyEnabled()
                 app.drawFirstSegmentPenaltyOverlay(ax, data);
@@ -2850,7 +2947,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 rayFanSettings.mode = string(app.RayFanModeDropdown.Value);
                 rayFanSettings.n_rays = round(app.RayCountField.Value);
                 rayFanSettings.manual_u_max = app.ManualUMaxField.Value;
-                validitySettings = struct('z_final', app.Data.img.z_img);
+                validitySettings = struct( ...
+                    'z_final', app.Data.img.trace_z_final);
 
                 app.setValiditySweepStatus("Computing validity field sweep...", false);
                 drawnow limitrate
