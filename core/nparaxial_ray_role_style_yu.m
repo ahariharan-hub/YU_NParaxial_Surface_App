@@ -273,7 +273,7 @@ function [color, lineStyle, displayName, marker, lineWidth] = ...
             lineWidth = 1.2;
         otherwise
             color = [0.56 0.56 0.56];
-            displayName = "Intermediate ray";
+            displayName = "Intermediate";
             lineWidth = 0.8;
     end
 
