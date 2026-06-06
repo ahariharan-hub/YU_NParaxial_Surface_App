@@ -11,6 +11,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
     properties (Access = private)
         RootFolder string
         CoreFolder string
+        WorkflowsFolder string
 
         MainGrid matlab.ui.container.GridLayout
         LeftGrid matlab.ui.container.GridLayout
@@ -92,12 +93,16 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         function startup(app)
             app.RootFolder = string(fileparts(mfilename('fullpath')));
             app.CoreFolder = fullfile(app.RootFolder, "core");
+            app.WorkflowsFolder = fullfile(app.RootFolder, "workflows");
 
             if exist(app.CoreFolder, 'dir')
                 addpath(app.CoreFolder);
             else
                 app.setStatus("Core helper folder was not found.", true);
                 return
+            end
+            if exist(app.WorkflowsFolder, 'dir')
+                addpath(app.WorkflowsFolder);
             end
 
             app.loadDefaults();
@@ -3113,16 +3118,26 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
 
             diag = app.Data.diagnostics;
-            tPerf = tic;
+            workflowElapsed = NaN;
             try
-                validity = nparaxial_paraxial_validity_yu( ...
-                    app.Data.bundleSet, app.Data.prescription, [], 1e-12);
+                workflowOpts = struct( ...
+                    'tol', 1e-12, ...
+                    'computeCardinal', false, ...
+                    'computePupilStop', false, ...
+                    'timingEnabled', app.PerformanceTimingEnabled, ...
+                    'z_final', app.Data.img.trace_z_final);
+                tWorkflow = tic;
+                workflow = nparaxial_run_validity_workflow_yu( ...
+                    app.Data.prescription, ...
+                    app.traceWorkflowRaySettings(), workflowOpts);
+                workflowElapsed = toc(tWorkflow);
+                validity = workflow.validity;
                 validityError = "";
+                app.mergePerformanceTimer(workflow.performance_timer);
             catch ME
                 validity = [];
                 validityError = string(ME.message);
             end
-            elapsed = toc(tPerf);
 
             diag.paraxial_validity = validity;
             diag.paraxial_validity_error = validityError;
@@ -3131,10 +3146,12 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.Cache.validityBaseData = validity;
             app.IsParaxialValidityDirty = isempty(validity) || ...
                 strlength(validityError) > 0;
-            app.recordPerformanceElapsed( ...
-                "paraxial-validity diagnostics", elapsed);
+            if ~isfinite(workflowElapsed)
+                workflowElapsed = 0;
+            end
             if strlength(string(timingSection)) > 0
-                app.recordPerformanceElapsed(string(timingSection), elapsed);
+                app.recordPerformanceElapsed( ...
+                    string(timingSection), workflowElapsed);
             end
         end
 
@@ -3333,12 +3350,19 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 app.setValiditySweepStatus("Computing validity field sweep...", false);
                 drawnow limitrate
 
-                tPerf = tic;
-                sweep = nparaxial_validity_field_sweep_yu( ...
-                    app.Data.prescription, app.Data.params.z_obj, ...
-                    fieldHeights, rayFanSettings, validitySettings, 1e-12);
-                app.recordPerformanceElapsed( ...
-                    "field-sweep calculation", toc(tPerf));
+                sweepSettings = struct( ...
+                    'field_heights', fieldHeights(:), ...
+                    'metric_name', string(app.ValiditySweepMetricDropdown.Value), ...
+                    'sweep_mode', string(app.ValiditySweepModeDropdown.Value));
+                workflowOpts = struct( ...
+                    'tol', 1e-12, ...
+                    'timingEnabled', app.PerformanceTimingEnabled, ...
+                    'z_final', app.Data.img.trace_z_final);
+                workflow = nparaxial_run_field_sweep_workflow_yu( ...
+                    app.Data.prescription, sweepSettings, ...
+                    app.sweepWorkflowRaySettings(rayFanSettings), workflowOpts);
+                app.mergePerformanceTimer(workflow.performance_timer);
+                sweep = workflow.sweep;
                 sweep.cache_signature = sweepSignature;
                 sweep.prescription_signature = app.currentPrescriptionSignature();
                 app.Data.validityFieldSweep = sweep;
@@ -3560,6 +3584,42 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 app.PerformanceTable.Data = ...
                     nparaxial_perf_timer_yu("summary", timer);
             end
+        end
+
+        function raySettings = traceWorkflowRaySettings(app)
+            raySettings = struct();
+            raySettings.z_obj = app.Data.params.z_obj;
+            raySettings.field_heights = app.Data.yFields(:);
+            raySettings.n_rays = app.Data.params.Nrays;
+            raySettings.fan_mode = app.Data.params.ray_fan_mode;
+            raySettings.u_max = app.Data.params.manual_u_max;
+            raySettings.manual_u_max = app.Data.params.manual_u_max;
+            raySettings.z_final = app.Data.img.trace_z_final;
+        end
+
+        function raySettings = sweepWorkflowRaySettings(app, rayFanSettings)
+            raySettings = struct();
+            raySettings.z_obj = app.Data.params.z_obj;
+            raySettings.mode = string(rayFanSettings.mode);
+            raySettings.n_rays = round(rayFanSettings.n_rays);
+            raySettings.manual_u_max = rayFanSettings.manual_u_max;
+            raySettings.z_final = app.Data.img.trace_z_final;
+        end
+
+        function mergePerformanceTimer(app, otherTimer)
+            if isempty(app.Data) || ~isstruct(app.Data)
+                return
+            end
+            data = app.Data;
+            if isfield(data, 'performance_timer')
+                timer = data.performance_timer;
+            else
+                timer = nparaxial_perf_timer_yu( ...
+                    "new", app.PerformanceTimingEnabled);
+            end
+            timer = nparaxial_perf_timer_yu("merge", timer, otherTimer);
+            data = app.attachPerformanceTables(data, timer);
+            app.Data = data;
         end
 
         function recordPerformanceElapsed(app, sectionName, elapsedSeconds)
