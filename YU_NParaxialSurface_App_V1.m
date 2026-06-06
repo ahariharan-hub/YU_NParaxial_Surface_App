@@ -75,6 +75,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         PrescriptionTable matlab.ui.control.Table
 
         Data struct
+        Cache struct
         PerformanceTimingEnabled logical = true
         IsRunning logical = false
         IsDirty logical = true
@@ -476,6 +477,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'Items', {'Current field only', 'Symmetric field sweep', ...
                 'Custom min/max field sweep'}, ...
                 'Value', 'Symmetric field sweep', ...
+                'Tag', 'nparaxial_validity_sweep_mode', ...
                 'ValueChangedFcn', @(~, ~) app.noteValiditySweepControlsChanged());
             app.ValiditySweepModeDropdown.Layout.Row = 1;
             app.ValiditySweepModeDropdown.Layout.Column = 2;
@@ -488,6 +490,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.ValiditySweepFieldMinField = uieditfield(sweepControlsGrid, ...
                 'numeric', ...
                 'Value', -10, ...
+                'Tag', 'nparaxial_validity_sweep_field_min', ...
                 'ValueChangedFcn', @(~, ~) app.noteValiditySweepControlsChanged());
             app.ValiditySweepFieldMinField.Layout.Row = 1;
             app.ValiditySweepFieldMinField.Layout.Column = 4;
@@ -500,6 +503,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.ValiditySweepFieldMaxField = uieditfield(sweepControlsGrid, ...
                 'numeric', ...
                 'Value', 10, ...
+                'Tag', 'nparaxial_validity_sweep_field_max', ...
                 'ValueChangedFcn', @(~, ~) app.noteValiditySweepControlsChanged());
             app.ValiditySweepFieldMaxField.Layout.Row = 1;
             app.ValiditySweepFieldMaxField.Layout.Column = 6;
@@ -514,6 +518,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'Limits', [1 Inf], ...
                 'RoundFractionalValues', 'on', ...
                 'Value', 11, ...
+                'Tag', 'nparaxial_validity_sweep_count', ...
                 'ValueChangedFcn', @(~, ~) app.noteValiditySweepControlsChanged());
             app.ValiditySweepCountField.Layout.Row = 1;
             app.ValiditySweepCountField.Layout.Column = 8;
@@ -538,17 +543,20 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'tir_count', ...
                 'invalid_normal_count'}, ...
                 'Value', 'max_abs_translation_delta_y', ...
+                'Tag', 'nparaxial_validity_sweep_metric', ...
                 'ValueChangedFcn', @(~, ~) app.refreshValiditySweepPlot());
             app.ValiditySweepMetricDropdown.Layout.Row = 2;
             app.ValiditySweepMetricDropdown.Layout.Column = [2 4];
 
             updateSweepButton = uibutton(sweepControlsGrid, 'push', ...
                 'Text', 'Update Validity Plot', ...
+                'Tag', 'nparaxial_update_validity_sweep', ...
                 'ButtonPushedFcn', @(~, ~) app.updateValidityFieldSweep());
             updateSweepButton.Layout.Row = 2;
             updateSweepButton.Layout.Column = [5 6];
             exportSweepButton = uibutton(sweepControlsGrid, 'push', ...
                 'Text', 'Export Field Sweep CSV', ...
+                'Tag', 'nparaxial_export_validity_sweep', ...
                 'ButtonPushedFcn', @(~, ~) app.exportValidityFieldSweepCsv());
             exportSweepButton.Layout.Row = 2;
             exportSweepButton.Layout.Column = [7 8];
@@ -995,6 +1003,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.PrescriptionTable.Data = nparaxial_default_prescription_yu();
             app.SelectedPrescriptionRows = [];
             app.Data = struct();
+            app.Cache = app.emptyCache();
             app.IsDirty = true;
             app.IsValiditySweepDirty = true;
         end
@@ -1336,11 +1345,16 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 prescription = nparaxial_validate_prescription_yu(app.PrescriptionTable.Data);
                 perf = nparaxial_perf_timer_yu( ...
                     "add_elapsed", perf, "prescription validation", toc(tPerf));
+                prescriptionSignature = nparaxial_prescription_signature_yu(prescription);
 
                 tPerf = tic;
-                nparaxial_event_sequence_yu(prescription);
+                eventSequence = nparaxial_event_sequence_yu(prescription);
                 perf = nparaxial_perf_timer_yu( ...
                     "add_elapsed", perf, "event sequence creation", toc(tPerf));
+                app.Cache = app.emptyCache();
+                app.Cache.prescriptionSignature = prescriptionSignature;
+                app.Cache.normalizedPrescription = prescription;
+                app.Cache.eventSequence = eventSequence;
 
                 tPerf = tic;
                 img = nparaxial_solve_image_plane_yu(prescription, params.z_obj);
@@ -1356,6 +1370,13 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 [data, perf] = app.computeCase(params, prescription, img, perf);
                 data = app.attachPerformanceTables(data, perf);
                 app.Data = data;
+                app.Cache.matrixChain = data.matrixChain;
+                app.Cache.cardinal = data.diagnostics.cardinal;
+                app.Cache.stopPupil = struct( ...
+                    'stop', data.diagnostics.stop, ...
+                    'pupil', data.diagnostics.pupil);
+                app.Cache.validityBaseData = data.diagnostics.paraxial_validity;
+                app.clearFieldSweepCache();
                 app.IsDirty = false;
                 app.IsValiditySweepDirty = true;
                 app.PrescriptionTable.Data = data.prescription;
@@ -1426,6 +1447,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function markDirty(app, reason)
             app.IsDirty = true;
+            app.clearAllCache();
             app.clearResults();
             message = "Inputs changed. Run Trace to refresh diagnostics.";
             if nargin >= 2 && strlength(string(reason)) > 0
@@ -3061,6 +3083,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function invalidateValiditySweep(app, message)
             app.IsValiditySweepDirty = true;
+            app.clearFieldSweepCache();
             if ~isempty(app.Data) && isstruct(app.Data) && ...
                     isfield(app.Data, 'validityFieldSweep')
                 app.Data = rmfield(app.Data, 'validityFieldSweep');
@@ -3097,6 +3120,25 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 rayFanSettings.manual_u_max = app.ManualUMaxField.Value;
                 validitySettings = struct( ...
                     'z_final', app.Data.img.trace_z_final);
+                sweepSignature = app.validityFieldSweepSignature( ...
+                    fieldHeights, rayFanSettings, validitySettings);
+
+                [hasCachedSweep, cachedSweep] = ...
+                    app.cachedValidityFieldSweep(sweepSignature);
+                if hasCachedSweep
+                    tPerf = tic;
+                    app.Data.validityFieldSweep = cachedSweep;
+                    app.IsValiditySweepDirty = false;
+                    app.ValiditySweepTable.Data = ...
+                        cachedSweep.sweep_summary_table;
+                    app.refreshValiditySweepPlot();
+                    app.recordPerformanceElapsed( ...
+                        "field-sweep cache reuse", toc(tPerf));
+                    app.setStatus("Reused cached paraxial-validity field sweep.", false);
+                    app.setValiditySweepStatus( ...
+                        "Reused cached field sweep; plot refreshed.", false);
+                    return
+                end
 
                 app.setValiditySweepStatus("Computing validity field sweep...", false);
                 drawnow limitrate
@@ -3107,7 +3149,13 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     fieldHeights, rayFanSettings, validitySettings, 1e-12);
                 app.recordPerformanceElapsed( ...
                     "field-sweep calculation", toc(tPerf));
+                sweep.cache_signature = sweepSignature;
+                sweep.prescription_signature = app.currentPrescriptionSignature();
                 app.Data.validityFieldSweep = sweep;
+                app.Cache.fieldSweepSignature = sweepSignature;
+                app.Cache.fieldSweep = sweep;
+                app.Cache.fieldSweepTable = sweep.sweep_summary_table;
+                app.Cache.fieldSweepTiming = app.Data.performance;
                 app.IsValiditySweepDirty = false;
                 app.ValiditySweepTable.Data = sweep.sweep_summary_table;
                 app.refreshValiditySweepPlot();
@@ -3346,6 +3394,95 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             data.performance_timer = timer;
             data.performance_log = nparaxial_perf_timer_yu("table", timer);
             data.performance = nparaxial_perf_timer_yu("summary", timer);
+        end
+
+        function cache = emptyCache(~)
+            cache = struct();
+            cache.prescriptionSignature = "";
+            cache.normalizedPrescription = table();
+            cache.eventSequence = table();
+            cache.matrixChain = [];
+            cache.cardinal = [];
+            cache.stopPupil = [];
+            cache.validityBaseData = [];
+            cache.fieldSweepSignature = "";
+            cache.fieldSweep = [];
+            cache.fieldSweepTable = table();
+            cache.fieldSweepTiming = table();
+        end
+
+        function clearAllCache(app)
+            app.Cache = app.emptyCache();
+        end
+
+        function clearFieldSweepCache(app)
+            if isempty(app.Cache) || ~isstruct(app.Cache)
+                app.Cache = app.emptyCache();
+                return
+            end
+            app.Cache.fieldSweepSignature = "";
+            app.Cache.fieldSweep = [];
+            app.Cache.fieldSweepTable = table();
+            app.Cache.fieldSweepTiming = table();
+        end
+
+        function sig = currentPrescriptionSignature(app)
+            if ~isempty(app.Cache) && isstruct(app.Cache) && ...
+                    isfield(app.Cache, 'prescriptionSignature') && ...
+                    strlength(app.Cache.prescriptionSignature) > 0
+                sig = string(app.Cache.prescriptionSignature);
+                return
+            end
+            sig = nparaxial_prescription_signature_yu(app.Data.prescription);
+        end
+
+        function sig = validityFieldSweepSignature(app, ...
+                fieldHeights, rayFanSettings, validitySettings)
+            fieldHeights = double(fieldHeights(:));
+            parts = [
+                "nparaxial_field_sweep_signature_v1"
+                "prescription=" + app.currentPrescriptionSignature()
+                "z_obj=" + sprintf('%.17g', app.Data.params.z_obj)
+                "z_final=" + sprintf('%.17g', validitySettings.z_final)
+                "ray_fan_mode=" + string(rayFanSettings.mode)
+                "n_rays=" + string(round(double(rayFanSettings.n_rays)))
+                "manual_u_max=" + sprintf('%.17g', rayFanSettings.manual_u_max)
+                "field_count=" + string(numel(fieldHeights))
+                "field_heights=" + join(string(arrayfun( ...
+                    @(v) sprintf('%.17g', v), fieldHeights, ...
+                    'UniformOutput', false)), ",")
+                "tol=1e-12"
+            ];
+            sig = strjoin(cellstr(parts), newline);
+            sig = string(sig);
+        end
+
+        function [tf, sweep] = cachedValidityFieldSweep(app, sweepSignature)
+            tf = false;
+            sweep = [];
+            if app.IsValiditySweepDirty
+                return
+            end
+
+            if ~isempty(app.Data) && isstruct(app.Data) && ...
+                    isfield(app.Data, 'validityFieldSweep') && ...
+                    ~isempty(app.Data.validityFieldSweep) && ...
+                    isfield(app.Data.validityFieldSweep, 'cache_signature') && ...
+                    string(app.Data.validityFieldSweep.cache_signature) == ...
+                    string(sweepSignature)
+                tf = true;
+                sweep = app.Data.validityFieldSweep;
+                return
+            end
+
+            if ~isempty(app.Cache) && isstruct(app.Cache) && ...
+                    isfield(app.Cache, 'fieldSweepSignature') && ...
+                    string(app.Cache.fieldSweepSignature) == string(sweepSignature) && ...
+                    isfield(app.Cache, 'fieldSweep') && ...
+                    ~isempty(app.Cache.fieldSweep)
+                tf = true;
+                sweep = app.Cache.fieldSweep;
+            end
         end
 
         function level = maxWarningLevel(~, levels)
