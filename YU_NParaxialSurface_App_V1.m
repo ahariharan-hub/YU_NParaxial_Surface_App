@@ -37,6 +37,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         FirstSegmentPenaltyCheckBox matlab.ui.control.CheckBox
         SurfaceAngleSchematicCheckBox matlab.ui.control.CheckBox
         CardinalPointsCheckBox matlab.ui.control.CheckBox
+        ValidityAutoAfterTraceCheckBox matlab.ui.control.CheckBox
+        ValidityUpdateButton matlab.ui.control.Button
         ValiditySweepModeDropdown matlab.ui.control.DropDown
         ValiditySweepFieldMinField matlab.ui.control.NumericEditField
         ValiditySweepFieldMaxField matlab.ui.control.NumericEditField
@@ -79,6 +81,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         PerformanceTimingEnabled logical = true
         IsRunning logical = false
         IsDirty logical = true
+        IsParaxialValidityDirty logical = true
         IsValiditySweepDirty logical = true
         SelectedPrescriptionRows double = []
         LastRefreshedTabTitle string = ""
@@ -449,18 +452,43 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.VignettingCumulativeTable.Layout.Column = 1;
 
             validityTab = uitab(app.TabGroup, 'Title', 'Paraxial Validity');
-            validityGrid = uigridlayout(validityTab, [3 1]);
-            validityGrid.RowHeight = {110, 92, '1x'};
+            validityGrid = uigridlayout(validityTab, [4 1]);
+            validityGrid.RowHeight = {110, 34, 92, '1x'};
             validityGrid.Padding = [8 8 8 8];
             validityGrid.RowSpacing = 8;
             app.ValidityTextArea = uitextarea(validityGrid, ...
                 'Editable', 'off', ...
-                'FontName', 'Consolas');
+                'FontName', 'Consolas', ...
+                'Tag', 'nparaxial_validity_text');
             app.ValidityTextArea.Layout.Row = 1;
             app.ValidityTextArea.Layout.Column = 1;
 
+            validityActionGrid = uigridlayout(validityGrid, [1 2]);
+            validityActionGrid.Layout.Row = 2;
+            validityActionGrid.Layout.Column = 1;
+            validityActionGrid.ColumnWidth = {210, '1x'};
+            validityActionGrid.RowHeight = {30};
+            validityActionGrid.Padding = [0 0 0 0];
+            validityActionGrid.ColumnSpacing = 10;
+
+            app.ValidityUpdateButton = uibutton(validityActionGrid, 'push', ...
+                'Text', 'Update Validity Diagnostics', ...
+                'Tag', 'nparaxial_update_validity_diagnostics', ...
+                'ButtonPushedFcn', @(~, ~) app.updateParaxialValidityDiagnostics());
+            app.ValidityUpdateButton.Layout.Row = 1;
+            app.ValidityUpdateButton.Layout.Column = 1;
+
+            app.ValidityAutoAfterTraceCheckBox = uicheckbox( ...
+                validityActionGrid, ...
+                'Text', 'Compute validity diagnostics after Run Trace', ...
+                'Value', false, ...
+                'Tag', 'nparaxial_auto_validity_after_trace', ...
+                'ValueChangedFcn', @(~, ~) app.handleAutoValidityAfterTraceChanged());
+            app.ValidityAutoAfterTraceCheckBox.Layout.Row = 1;
+            app.ValidityAutoAfterTraceCheckBox.Layout.Column = 2;
+
             sweepControlsGrid = uigridlayout(validityGrid, [2 8]);
-            sweepControlsGrid.Layout.Row = 2;
+            sweepControlsGrid.Layout.Row = 3;
             sweepControlsGrid.Layout.Column = 1;
             sweepControlsGrid.RowHeight = {26, 30};
             sweepControlsGrid.ColumnWidth = {92, 120, 66, 72, 66, 72, 112, '1x'};
@@ -562,7 +590,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             exportSweepButton.Layout.Column = [7 8];
 
             validityTabs = uitabgroup(validityGrid);
-            validityTabs.Layout.Row = 3;
+            validityTabs.Layout.Row = 4;
             validityTabs.Layout.Column = 1;
             validityTablesTab = uitab(validityTabs, 'Title', 'Summary / Tables');
             validityTablesGrid = uigridlayout(validityTablesTab, [6 1]);
@@ -576,6 +604,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             validitySummaryLabel.Layout.Row = 1;
             validitySummaryLabel.Layout.Column = 1;
             app.ValiditySummaryTable = uitable(validityTablesGrid);
+            app.ValiditySummaryTable.Tag = 'nparaxial_validity_summary_table';
             app.ValiditySummaryTable.Layout.Row = 2;
             app.ValiditySummaryTable.Layout.Column = 1;
 
@@ -585,6 +614,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             validitySegmentLabel.Layout.Row = 3;
             validitySegmentLabel.Layout.Column = 1;
             app.ValiditySegmentTable = uitable(validityTablesGrid);
+            app.ValiditySegmentTable.Tag = 'nparaxial_validity_segment_table';
             app.ValiditySegmentTable.Layout.Row = 4;
             app.ValiditySegmentTable.Layout.Column = 1;
 
@@ -594,6 +624,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             validityEventLabel.Layout.Row = 5;
             validityEventLabel.Layout.Column = 1;
             app.ValidityEventTable = uitable(validityTablesGrid);
+            app.ValidityEventTable.Tag = 'nparaxial_validity_event_table';
             app.ValidityEventTable.Layout.Row = 6;
             app.ValidityEventTable.Layout.Column = 1;
 
@@ -611,6 +642,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.ValiditySweepAxes.Layout.Row = 2;
             app.ValiditySweepAxes.Layout.Column = 1;
             app.ValiditySweepTable = uitable(validityPlotGrid);
+            app.ValiditySweepTable.Tag = 'nparaxial_validity_sweep_table';
             app.ValiditySweepTable.Layout.Row = 3;
             app.ValiditySweepTable.Layout.Column = 1;
 
@@ -1000,11 +1032,16 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             if ~isempty(app.PresetDropdown) && isvalid(app.PresetDropdown)
                 app.PresetDropdown.Value = 'Two thin lenses';
             end
+            if ~isempty(app.ValidityAutoAfterTraceCheckBox) && ...
+                    isvalid(app.ValidityAutoAfterTraceCheckBox)
+                app.ValidityAutoAfterTraceCheckBox.Value = false;
+            end
             app.PrescriptionTable.Data = nparaxial_default_prescription_yu();
             app.SelectedPrescriptionRows = [];
             app.Data = struct();
             app.Cache = app.emptyCache();
             app.IsDirty = true;
+            app.IsParaxialValidityDirty = true;
             app.IsValiditySweepDirty = true;
         end
 
@@ -1253,6 +1290,12 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 if ~app.hasTraceData("Run Trace before exporting paraxial-validity data.")
                     return
                 end
+                if ~app.hasCurrentParaxialValidityDiagnostics()
+                    app.setStatus( ...
+                        "Update Validity Diagnostics before exporting paraxial-validity data.", ...
+                        true);
+                    return
+                end
                 app.exportTableCsvWithDialog( ...
                     app.makeParaxialValidityExportTable(), ...
                     'nparaxial_validity.csv', ...
@@ -1330,6 +1373,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             cleanup = onCleanup(@() app.finishTrace());
 
             try
+                tBasicRunTrace = tic;
                 perf = nparaxial_perf_timer_yu( ...
                     "new", app.PerformanceTimingEnabled);
                 app.setStatus("Tracing...", false);
@@ -1375,13 +1419,41 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 app.Cache.stopPupil = struct( ...
                     'stop', data.diagnostics.stop, ...
                     'pupil', data.diagnostics.pupil);
-                app.Cache.validityBaseData = data.diagnostics.paraxial_validity;
+                app.Cache.validityBaseData = [];
                 app.clearFieldSweepCache();
                 app.IsDirty = false;
+                app.IsParaxialValidityDirty = true;
                 app.IsValiditySweepDirty = true;
                 app.PrescriptionTable.Data = data.prescription;
                 app.refreshSelectedTab();
-                app.setStatus(app.traceStatusMessage(data), false);
+                app.recordPerformanceElapsed( ...
+                    "Basic Run Trace", toc(tBasicRunTrace));
+
+                if app.computeValidityAfterTraceEnabled()
+                    app.computeParaxialValidityDiagnostics( ...
+                        "Run Trace automatic validity");
+                    if string(app.TabGroup.SelectedTab.Title) == ...
+                            "Paraxial Validity"
+                        app.refreshParaxialValidityDiagnostics();
+                    end
+                    app.recordPerformanceElapsed( ...
+                        "Run Trace with automatic validity", ...
+                        toc(tBasicRunTrace));
+                    if app.hasCurrentParaxialValidityDiagnostics()
+                        app.setStatus(app.traceStatusMessage(data) + ...
+                            " Paraxial-validity diagnostics updated.", false);
+                    else
+                        app.setStatus(app.traceStatusMessage(data) + ...
+                            " Paraxial-validity diagnostics unavailable.", true);
+                    end
+                else
+                    if string(app.TabGroup.SelectedTab.Title) == ...
+                            "Paraxial Validity"
+                        app.refreshParaxialValidityDiagnostics();
+                    end
+                    app.setStatus(app.traceStatusMessage(data) + ...
+                        " Paraxial-validity diagnostics are stale.", false);
+                end
             catch ME
                 app.IsDirty = true;
                 app.clearResults();
@@ -1447,6 +1519,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function markDirty(app, reason)
             app.IsDirty = true;
+            app.IsParaxialValidityDirty = true;
             app.clearAllCache();
             app.clearResults();
             message = "Inputs changed. Run Trace to refresh diagnostics.";
@@ -1458,6 +1531,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function clearResults(app)
             app.Data = struct();
+            app.IsParaxialValidityDirty = true;
             app.IsValiditySweepDirty = true;
 
             staleText = {'Inputs changed. Run Trace to refresh diagnostics.'};
@@ -1695,22 +1769,10 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 params, prescription, img, primaryStop, fieldTable);
             [diagnostics, perf] = app.computeFirstOrderDiagnostics( ...
                 params, prescription, img, perf);
-            try
-                tPerf = tic;
-                diagnostics.paraxial_validity = ...
-                    nparaxial_paraxial_validity_yu( ...
-                    bundleSet, prescription, [], 1e-12);
-                diagnostics.paraxial_validity_error = "";
-                perf = nparaxial_perf_timer_yu( ...
-                    "add_elapsed", perf, ...
-                    "paraxial-validity diagnostics", toc(tPerf));
-            catch ME
-                perf = nparaxial_perf_timer_yu( ...
-                    "add_elapsed", perf, ...
-                    "paraxial-validity diagnostics", toc(tPerf));
-                diagnostics.paraxial_validity = [];
-                diagnostics.paraxial_validity_error = string(ME.message);
-            end
+            diagnostics.paraxial_validity = [];
+            diagnostics.paraxial_validity_error = ...
+                "Paraxial validity diagnostics are stale. Press Update Validity Diagnostics.";
+            diagnostics.paraxial_validity_is_stale = true;
 
             data = struct();
             data.params = params;
@@ -2167,9 +2229,11 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function T = makeParaxialValidityExportTable(app)
             diag = app.Data.diagnostics;
-            if ~isfield(diag, 'paraxial_validity') || ...
+            if app.IsParaxialValidityDirty || ...
+                    ~isfield(diag, 'paraxial_validity') || ...
                     isempty(diag.paraxial_validity)
-                error('Paraxial-validity diagnostics are unavailable.');
+                error(['Paraxial-validity diagnostics are stale. ', ...
+                    'Press Update Validity Diagnostics.']);
             end
             validity = diag.paraxial_validity;
 
@@ -2483,7 +2547,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 case "Vignetting"
                     app.updateVignettingDiagnostics();
                 case "Paraxial Validity"
-                    app.updateParaxialValidityDiagnostics();
+                    app.refreshParaxialValidityDiagnostics();
                 case "Chief / Marginal Rays"
                     app.updateChiefMarginalDiagnostics();
                 case "Invariant / Phase Space"
@@ -3012,21 +3076,102 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         end
 
         function updateParaxialValidityDiagnostics(app)
-            diag = app.Data.diagnostics;
-            if ~isfield(diag, 'paraxial_validity') || ...
-                    isempty(diag.paraxial_validity) || ...
-                    (isfield(diag, 'paraxial_validity_error') && ...
-                    strlength(diag.paraxial_validity_error) > 0)
-                message = "";
-                if isfield(diag, 'paraxial_validity_error')
-                    message = diag.paraxial_validity_error;
+            try
+                if ~app.hasTraceData( ...
+                        "Run Trace before updating paraxial-validity diagnostics.")
+                    return
                 end
+                app.setStatus( ...
+                    "Computing paraxial-validity diagnostics...", false);
+                drawnow limitrate
+
+                app.computeParaxialValidityDiagnostics( ...
+                    "Explicit Paraxial Validity update");
+                app.refreshParaxialValidityDiagnostics();
+                if app.hasCurrentParaxialValidityDiagnostics()
+                    app.setStatus( ...
+                        "Updated paraxial-validity diagnostics.", false);
+                else
+                    app.setStatus( ...
+                        "Paraxial-validity diagnostics unavailable.", true);
+                end
+            catch ME
+                app.IsParaxialValidityDirty = true;
+                app.setStatus("Paraxial validity update error: " + ...
+                    string(ME.message), true);
+                app.refreshParaxialValidityDiagnostics();
+            end
+        end
+
+        function computeParaxialValidityDiagnostics(app, timingSection)
+            if nargin < 2
+                timingSection = "";
+            end
+            if isempty(app.Data) || ~isstruct(app.Data) || ...
+                    ~isfield(app.Data, 'bundleSet')
+                error('Run Trace before updating paraxial-validity diagnostics.');
+            end
+
+            diag = app.Data.diagnostics;
+            tPerf = tic;
+            try
+                validity = nparaxial_paraxial_validity_yu( ...
+                    app.Data.bundleSet, app.Data.prescription, [], 1e-12);
+                validityError = "";
+            catch ME
+                validity = [];
+                validityError = string(ME.message);
+            end
+            elapsed = toc(tPerf);
+
+            diag.paraxial_validity = validity;
+            diag.paraxial_validity_error = validityError;
+            diag.paraxial_validity_is_stale = false;
+            app.Data.diagnostics = diag;
+            app.Cache.validityBaseData = validity;
+            app.IsParaxialValidityDirty = isempty(validity) || ...
+                strlength(validityError) > 0;
+            app.recordPerformanceElapsed( ...
+                "paraxial-validity diagnostics", elapsed);
+            if strlength(string(timingSection)) > 0
+                app.recordPerformanceElapsed(string(timingSection), elapsed);
+            end
+        end
+
+        function refreshParaxialValidityDiagnostics(app)
+            if isempty(app.Data) || ~isstruct(app.Data) || ...
+                    ~isfield(app.Data, 'diagnostics')
+                return
+            end
+
+            diag = app.Data.diagnostics;
+            if app.IsParaxialValidityDirty || ...
+                    ~isfield(diag, 'paraxial_validity') || ...
+                    isempty(diag.paraxial_validity) || ...
+                    (isfield(diag, 'paraxial_validity_is_stale') && ...
+                    diag.paraxial_validity_is_stale)
                 app.ValidityTextArea.Value = { ...
                     'Paraxial validity diagnostics'
                     '-----------------------------'
                     'Diagnostic only: main tracing remains paraxial.'
                     'u is the paraxial ray angle in radians.'
-                    char("Diagnostics unavailable: " + message)
+                    char(app.validityStaleMessage())
+                    };
+                app.ValiditySummaryTable.Data = table();
+                app.ValiditySegmentTable.Data = table();
+                app.ValidityEventTable.Data = table();
+                return
+            end
+
+            if isfield(diag, 'paraxial_validity_error') && ...
+                    strlength(diag.paraxial_validity_error) > 0
+                app.ValidityTextArea.Value = { ...
+                    'Paraxial validity diagnostics'
+                    '-----------------------------'
+                    'Diagnostic only: main tracing remains paraxial.'
+                    'u is the paraxial ray angle in radians.'
+                    char("Diagnostics unavailable: " + ...
+                    diag.paraxial_validity_error)
                     };
                 app.ValiditySummaryTable.Data = table();
                 app.ValiditySegmentTable.Data = table();
@@ -3073,6 +3218,51 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 app.ValiditySweepTable.Data = ...
                     app.Data.validityFieldSweep.sweep_summary_table;
                 app.refreshValiditySweepPlot();
+            end
+        end
+
+        function tf = hasCurrentParaxialValidityDiagnostics(app)
+            tf = false;
+            if app.IsParaxialValidityDirty || isempty(app.Data) || ...
+                    ~isstruct(app.Data) || ~isfield(app.Data, 'diagnostics')
+                return
+            end
+            diag = app.Data.diagnostics;
+            if ~isfield(diag, 'paraxial_validity') || ...
+                    isempty(diag.paraxial_validity)
+                return
+            end
+            if isfield(diag, 'paraxial_validity_is_stale') && ...
+                    diag.paraxial_validity_is_stale
+                return
+            end
+            if isfield(diag, 'paraxial_validity_error') && ...
+                    strlength(diag.paraxial_validity_error) > 0
+                return
+            end
+            tf = true;
+        end
+
+        function message = validityStaleMessage(~)
+            message = ...
+                "Paraxial validity diagnostics are stale. Press Update Validity Diagnostics.";
+        end
+
+        function tf = computeValidityAfterTraceEnabled(app)
+            tf = ~isempty(app.ValidityAutoAfterTraceCheckBox) && ...
+                isvalid(app.ValidityAutoAfterTraceCheckBox) && ...
+                app.ValidityAutoAfterTraceCheckBox.Value;
+        end
+
+        function handleAutoValidityAfterTraceChanged(app)
+            if app.computeValidityAfterTraceEnabled()
+                app.setStatus( ...
+                    "Run Trace will compute paraxial-validity diagnostics.", ...
+                    false);
+            else
+                app.setStatus( ...
+                    "Run Trace will leave paraxial-validity diagnostics on demand.", ...
+                    false);
             end
         end
 

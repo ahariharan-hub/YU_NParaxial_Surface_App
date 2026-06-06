@@ -66,6 +66,8 @@ function results = demo_nparaxial_milestone250_performance_instrumentation_yu()
             "legend update"
             "plot overlays"
             "field-sweep calculation"
+            "Basic Run Trace"
+            "Explicit Paraxial Validity update"
         ];
         assert(all(ismember(requiredSections, appTiming.section)), ...
             'App timing table should contain the required instrumentation sections.');
@@ -108,6 +110,12 @@ function [status, timingTable] = app_smoke_local(rootFolder)
 
     runButton = find_button_local(app.UIFigure, 'Run Trace');
     call_callback_local(runButton.ButtonPushedFcn, runButton);
+    drawnow limitrate
+
+    updateValidityButton = find_button_local( ...
+        app.UIFigure, 'Update Validity Diagnostics');
+    call_callback_local(updateValidityButton.ButtonPushedFcn, ...
+        updateValidityButton);
     drawnow limitrate
 
     updateSweepButton = find_button_local(app.UIFigure, 'Update Validity Plot');
