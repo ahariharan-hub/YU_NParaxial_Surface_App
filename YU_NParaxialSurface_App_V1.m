@@ -57,6 +57,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         ValidityTextArea matlab.ui.control.TextArea
         ChiefTextArea matlab.ui.control.TextArea
         InvariantTextArea matlab.ui.control.TextArea
+        PerformanceTextArea matlab.ui.control.TextArea
         MatrixTable matlab.ui.control.Table
         MatrixChainTable matlab.ui.control.Table
         CardinalTable matlab.ui.control.Table
@@ -70,9 +71,11 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         ChiefEventTable matlab.ui.control.Table
         InvariantSummaryTable matlab.ui.control.Table
         PhaseSpaceTable matlab.ui.control.Table
+        PerformanceTable matlab.ui.control.Table
         PrescriptionTable matlab.ui.control.Table
 
         Data struct
+        PerformanceTimingEnabled logical = true
         IsRunning logical = false
         IsDirty logical = true
         IsValiditySweepDirty logical = true
@@ -637,6 +640,22 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.PhaseSpaceTable.Layout.Row = 3;
             app.PhaseSpaceTable.Layout.Column = 1;
 
+            performanceTab = uitab(app.TabGroup, 'Title', 'Performance');
+            performanceGrid = uigridlayout(performanceTab, [2 1]);
+            performanceGrid.RowHeight = {130, '1x'};
+            performanceGrid.Padding = [8 8 8 8];
+            performanceGrid.RowSpacing = 8;
+            app.PerformanceTextArea = uitextarea(performanceGrid, ...
+                'Editable', 'off', ...
+                'FontName', 'Consolas', ...
+                'Tag', 'nparaxial_performance_text');
+            app.PerformanceTextArea.Layout.Row = 1;
+            app.PerformanceTextArea.Layout.Column = 1;
+            app.PerformanceTable = uitable(performanceGrid, ...
+                'Tag', 'nparaxial_performance_table');
+            app.PerformanceTable.Layout.Row = 2;
+            app.PerformanceTable.Layout.Column = 1;
+
             equationsTab = uitab(app.TabGroup, 'Title', 'Equations');
             equationsGrid = uigridlayout(equationsTab, [1 1]);
             equationsGrid.Padding = [8 8 8 8];
@@ -717,6 +736,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Vignetting"));
             uimenu(viewMenu, 'Text', 'Show Paraxial Validity', ...
                 'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Paraxial Validity"));
+            uimenu(viewMenu, 'Text', 'Show Performance', ...
+                'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Performance"));
             uimenu(viewMenu, 'Text', 'Show Equations', ...
                 'MenuSelectedFcn', @(~, ~) app.selectTabByTitle("Equations"));
             uimenu(viewMenu, 'Text', 'Refresh Current View', ...
@@ -1101,8 +1122,11 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 end
 
                 filename = fullfile(pathName, fileName);
+                tPerf = tic;
                 filename = nparaxial_export_table_csv_yu( ...
                     app.makeRayExportTable(), filename);
+                app.recordPerformanceElapsed( ...
+                    "export/report generation", toc(tPerf));
                 app.setStatus("Exported ray table CSV: " + string(filename), false);
             catch ME
                 app.setStatus("Export rays error: " + string(ME.message), true);
@@ -1124,8 +1148,11 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 end
 
                 filename = fullfile(pathName, fileName);
+                tPerf = tic;
                 lines = app.summaryExportLines();
                 filename = nparaxial_export_summary_txt_yu(lines, filename);
+                app.recordPerformanceElapsed( ...
+                    "export/report generation", toc(tPerf));
                 app.setStatus("Exported summary TXT: " + string(filename), false);
             catch ME
                 app.setStatus("Export summary error: " + string(ME.message), true);
@@ -1270,10 +1297,13 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 end
 
                 filename = fullfile(pathName, fileName);
+                tPerf = tic;
                 lines = nparaxial_combined_report_yu( ...
                     app.Data.prescription, app.Data.matrixTable, ...
                     app.Data.img, app.Data.diagnostics, app.Data.summaryLines);
                 filename = nparaxial_export_summary_txt_yu(lines, filename);
+                app.recordPerformanceElapsed( ...
+                    "export/report generation", toc(tPerf));
                 app.setStatus("Exported first-order report TXT: " + ...
                     string(filename), false);
             catch ME
@@ -1291,13 +1321,31 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             cleanup = onCleanup(@() app.finishTrace());
 
             try
+                perf = nparaxial_perf_timer_yu( ...
+                    "new", app.PerformanceTimingEnabled);
                 app.setStatus("Tracing...", false);
                 app.clearCardinalPointOverlay();
                 drawnow limitrate
 
+                tPerf = tic;
                 params = app.readParameters();
+                perf = nparaxial_perf_timer_yu( ...
+                    "add_elapsed", perf, "parameter read", toc(tPerf));
+
+                tPerf = tic;
                 prescription = nparaxial_validate_prescription_yu(app.PrescriptionTable.Data);
+                perf = nparaxial_perf_timer_yu( ...
+                    "add_elapsed", perf, "prescription validation", toc(tPerf));
+
+                tPerf = tic;
+                nparaxial_event_sequence_yu(prescription);
+                perf = nparaxial_perf_timer_yu( ...
+                    "add_elapsed", perf, "event sequence creation", toc(tPerf));
+
+                tPerf = tic;
                 img = nparaxial_solve_image_plane_yu(prescription, params.z_obj);
+                perf = nparaxial_perf_timer_yu( ...
+                    "add_elapsed", perf, "image solve/classification", toc(tPerf));
 
                 if ~isfield(img, 'trace_z_final') || ...
                         ~isfinite(img.trace_z_final) || ...
@@ -1305,7 +1353,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     error('Forward diagnostic trace endpoint is unavailable.');
                 end
 
-                data = app.computeCase(params, prescription, img);
+                [data, perf] = app.computeCase(params, prescription, img, perf);
+                data = app.attachPerformanceTables(data, perf);
                 app.Data = data;
                 app.IsDirty = false;
                 app.IsValiditySweepDirty = true;
@@ -1469,6 +1518,12 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             if ~isempty(app.PhaseSpaceTable) && isvalid(app.PhaseSpaceTable)
                 app.PhaseSpaceTable.Data = table();
             end
+            if ~isempty(app.PerformanceTextArea) && isvalid(app.PerformanceTextArea)
+                app.PerformanceTextArea.Value = staleText;
+            end
+            if ~isempty(app.PerformanceTable) && isvalid(app.PerformanceTable)
+                app.PerformanceTable.Data = table();
+            end
         end
 
         function params = readParameters(app)
@@ -1506,7 +1561,12 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
         end
 
-        function data = computeCase(app, params, prescription, img)
+        function [data, perf] = computeCase(app, params, prescription, img, perf)
+            if nargin < 5 || isempty(perf)
+                perf = nparaxial_perf_timer_yu( ...
+                    "new", app.PerformanceTimingEnabled);
+            end
+
             yFields = app.buildFieldHeights(params);
             zTrace = app.traceEndpointZ(img);
             primaryStop = app.findPrimaryStop(prescription, params.z_obj, zTrace);
@@ -1532,15 +1592,24 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
             for q = 1:numel(yFields)
                 yObj = yFields(q);
+                tPerf = tic;
                 [rays, fanInfo] = app.makeRayFan( ...
                     params, prescription, img, yObj);
+                perf = nparaxial_perf_timer_yu( ...
+                    "add_elapsed", perf, "ray fan generation", toc(tPerf));
                 if height(rays) > 0
                     rays.name = "field_" + string(q) + "_" + rays.name;
                     rays.ray_name = rays.name;
+                    tPerf = tic;
                     bundle = nparaxial_trace_bundle_yu( ...
                         rays, prescription, zTrace);
+                    perf = nparaxial_perf_timer_yu( ...
+                        "add_elapsed", perf, "ray tracing", toc(tPerf));
                 else
+                    tPerf = tic;
                     bundle = app.emptyTraceBundle();
+                    perf = nparaxial_perf_timer_yu( ...
+                        "add_elapsed", perf, "ray tracing", toc(tPerf));
                 end
                 diag = app.imageDiagnostics(bundle);
 
@@ -1595,18 +1664,28 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             fieldTable.ray_fan_upper_limiter = ray_fan_upper_limiter;
 
             matrixTable = app.makeMatrixTable(img, params.z_obj);
+            tPerf = tic;
             matrixChain = nparaxial_matrix_chain_yu( ...
                 prescription, params.z_obj, zTrace);
+            perf = nparaxial_perf_timer_yu( ...
+                "add_elapsed", perf, "system matrix calculation", toc(tPerf));
             summaryLines = app.makeSummaryLines( ...
                 params, prescription, img, primaryStop, fieldTable);
-            diagnostics = app.computeFirstOrderDiagnostics( ...
-                params, prescription, img);
+            [diagnostics, perf] = app.computeFirstOrderDiagnostics( ...
+                params, prescription, img, perf);
             try
+                tPerf = tic;
                 diagnostics.paraxial_validity = ...
                     nparaxial_paraxial_validity_yu( ...
                     bundleSet, prescription, [], 1e-12);
                 diagnostics.paraxial_validity_error = "";
+                perf = nparaxial_perf_timer_yu( ...
+                    "add_elapsed", perf, ...
+                    "paraxial-validity diagnostics", toc(tPerf));
             catch ME
+                perf = nparaxial_perf_timer_yu( ...
+                    "add_elapsed", perf, ...
+                    "paraxial-validity diagnostics", toc(tPerf));
                 diagnostics.paraxial_validity = [];
                 diagnostics.paraxial_validity_error = string(ME.message);
             end
@@ -1627,9 +1706,11 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             data.diagnostics = diagnostics;
         end
 
-        function diagnostics = computeFirstOrderDiagnostics(~, params, prescription, img)
-            diagnostics = nparaxial_field_diagnostics_yu( ...
-                prescription, params.z_obj, img.trace_z_final, params.y_diag);
+        function [diagnostics, perf] = computeFirstOrderDiagnostics(~, ...
+                params, prescription, img, perf)
+            [diagnostics, perf] = nparaxial_field_diagnostics_yu( ...
+                prescription, params.z_obj, img.trace_z_final, ...
+                params.y_diag, 1e-12, perf);
         end
 
         function zTrace = traceEndpointZ(~, img)
@@ -1936,7 +2017,10 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
 
             filename = fullfile(pathName, fileName);
+            tPerf = tic;
             filename = nparaxial_export_table_csv_yu(T, filename);
+            app.recordPerformanceElapsed( ...
+                "export/report generation", toc(tPerf));
             app.setStatus(string(statusText) + ": " + string(filename), false);
         end
 
@@ -2382,6 +2466,8 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     app.updateChiefMarginalDiagnostics();
                 case "Invariant / Phase Space"
                     app.updateInvariantDiagnostics();
+                case "Performance"
+                    app.updatePerformanceDiagnostics();
                 otherwise
                     % Prescription table is directly editable.
             end
@@ -2389,6 +2475,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function plotRayDiagram(app)
             ax = app.RayAxes;
+            tRedraw = tic;
             app.clearCardinalPointOverlay();
             cla(ax);
             hold(ax, 'on');
@@ -2497,6 +2584,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             xLimits = [xMin - xPad, xMax + xPad];
             xlim(ax, xLimits);
 
+            tOverlay = tic;
             if data.img.is_finite && data.img.is_virtual && ...
                     data.img.z_img >= xLimits(1) && data.img.z_img <= xLimits(2)
                 plot(ax, [data.img.z_img, data.img.z_img], yLim, ...
@@ -2516,10 +2604,12 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             if app.surfaceAngleSchematicEnabled()
                 app.drawSurfaceAngleSchematicOverlay(ax, data);
             end
+            app.recordPerformanceElapsed("plot overlays", toc(tOverlay));
 
             xlabel(ax, 'z');
             ylabel(ax, 'y');
             title(ax, "N-element paraxial ray trace - " + data.rayFanLabel);
+            tLegend = tic;
             [legendHandles, legendNames] = nparaxial_legend_unique_yu( ...
                 legendHandles, legendNames);
             if isempty(legendHandles)
@@ -2529,7 +2619,9 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                     'Location', 'best');
                 lgd.Interpreter = 'none';
             end
+            app.recordPerformanceElapsed("legend update", toc(tLegend));
             hold(ax, 'off');
+            app.recordPerformanceElapsed("Ray Diagram redraw", toc(tRedraw));
         end
 
         function drawElement(app, ax, element, yLim)
@@ -3009,9 +3101,12 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 app.setValiditySweepStatus("Computing validity field sweep...", false);
                 drawnow limitrate
 
+                tPerf = tic;
                 sweep = nparaxial_validity_field_sweep_yu( ...
                     app.Data.prescription, app.Data.params.z_obj, ...
                     fieldHeights, rayFanSettings, validitySettings, 1e-12);
+                app.recordPerformanceElapsed( ...
+                    "field-sweep calculation", toc(tPerf));
                 app.Data.validityFieldSweep = sweep;
                 app.IsValiditySweepDirty = false;
                 app.ValiditySweepTable.Data = sweep.sweep_summary_table;
@@ -3064,6 +3159,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             if isempty(app.ValiditySweepAxes) || ~isvalid(app.ValiditySweepAxes)
                 return
             end
+            tPerf = tic;
             app.clearValiditySweepDisplay('Paraxial validity field sweep');
             metric = string(app.ValiditySweepMetricDropdown.Value);
             ylabel(app.ValiditySweepAxes, char(metric), 'Interpreter', 'none');
@@ -3102,6 +3198,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 app.setValiditySweepStatus( ...
                     "Field sweep plotted: " + metric + " versus field height.", false);
             end
+            app.recordPerformanceElapsed("field-sweep plot redraw", toc(tPerf));
         end
 
         function setValiditySweepStatus(app, message, isError)
@@ -3198,6 +3295,57 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 };
             app.InvariantSummaryTable.Data = diag.invariant.summary;
             app.PhaseSpaceTable.Data = diag.phase_space;
+        end
+
+        function updatePerformanceDiagnostics(app)
+            if isempty(app.PerformanceTextArea) || ...
+                    ~isvalid(app.PerformanceTextArea)
+                return
+            end
+
+            if isempty(app.Data) || ~isstruct(app.Data) || ...
+                    ~isfield(app.Data, 'performance_timer')
+                app.PerformanceTextArea.Value = { ...
+                    'Performance timings'
+                    '-------------------'
+                    'Run Trace to collect timing data.'};
+                if ~isempty(app.PerformanceTable) && isvalid(app.PerformanceTable)
+                    app.PerformanceTable.Data = table();
+                end
+                return
+            end
+
+            timer = app.Data.performance_timer;
+            lines = nparaxial_perf_timer_yu("format", timer, 12);
+            app.PerformanceTextArea.Value = cellstr(lines);
+            if ~isempty(app.PerformanceTable) && isvalid(app.PerformanceTable)
+                app.PerformanceTable.Data = ...
+                    nparaxial_perf_timer_yu("summary", timer);
+            end
+        end
+
+        function recordPerformanceElapsed(app, sectionName, elapsedSeconds)
+            if isempty(app.Data) || ~isstruct(app.Data)
+                return
+            end
+
+            data = app.Data;
+            if isfield(data, 'performance_timer')
+                timer = data.performance_timer;
+            else
+                timer = nparaxial_perf_timer_yu( ...
+                    "new", app.PerformanceTimingEnabled);
+            end
+            timer = nparaxial_perf_timer_yu( ...
+                "add_elapsed", timer, sectionName, elapsedSeconds);
+            data = app.attachPerformanceTables(data, timer);
+            app.Data = data;
+        end
+
+        function data = attachPerformanceTables(~, data, timer)
+            data.performance_timer = timer;
+            data.performance_log = nparaxial_perf_timer_yu("table", timer);
+            data.performance = nparaxial_perf_timer_yu("summary", timer);
         end
 
         function level = maxWarningLevel(~, levels)

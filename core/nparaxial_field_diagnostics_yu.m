@@ -1,5 +1,5 @@
-function diagnostics = nparaxial_field_diagnostics_yu( ...
-    prescription, z_obj, z_img, y_field, tol)
+function [diagnostics, perfTimer] = nparaxial_field_diagnostics_yu( ...
+    prescription, z_obj, z_img, y_field, tol, perfTimer)
 %NPARAXIAL_FIELD_DIAGNOSTICS_YU Collect field-dependent first-order diagnostics.
 
     if nargin < 4 || isempty(y_field)
@@ -7,6 +7,9 @@ function diagnostics = nparaxial_field_diagnostics_yu( ...
     end
     if nargin < 5 || isempty(tol)
         tol = 1e-12;
+    end
+    if nargin < 6 || isempty(perfTimer)
+        perfTimer = nparaxial_perf_timer_yu("new", false);
     end
     if ~isscalar(z_obj) || ~isfinite(z_obj) || ...
             ~isscalar(z_img) || ~isfinite(z_img) || ...
@@ -52,13 +55,17 @@ function diagnostics = nparaxial_field_diagnostics_yu( ...
         diagnostics.field_label = "off_axis_using_axial_stop";
     end
 
+    tPerf = tic;
     try
         diagnostics.cardinal = nparaxial_cardinal_points_yu( ...
             prescription, zFront, zRear, tol);
     catch ME
         diagnostics.cardinal_error = string(ME.message);
     end
+    perfTimer = nparaxial_perf_timer_yu( ...
+        "add_elapsed", perfTimer, "cardinal diagnostics", toc(tPerf));
 
+    tPerf = tic;
     try
         diagnostics.vignetting = nparaxial_vignetting_intervals_yu( ...
             prescription, z_obj, y_field, z_img, tol);
@@ -67,7 +74,10 @@ function diagnostics = nparaxial_field_diagnostics_yu( ...
     catch ME
         diagnostics.vignetting_error = string(ME.message);
     end
+    perfTimer = nparaxial_perf_timer_yu( ...
+        "add_elapsed", perfTimer, "vignetting interval calculation", toc(tPerf));
 
+    tPerf = tic;
     try
         diagnostics.stop = nparaxial_select_aperture_stop_yu( ...
             prescription, z_obj, 0, tol);
@@ -79,24 +89,33 @@ function diagnostics = nparaxial_field_diagnostics_yu( ...
     catch ME
         diagnostics.stop_error = string(ME.message);
     end
+    perfTimer = nparaxial_perf_timer_yu( ...
+        "add_elapsed", perfTimer, "pupil/stop diagnostics", toc(tPerf));
 
     if ~isempty(diagnostics.stop) && diagnostics.stop.has_stop
         selectedEvent = diagnostics.stop.selected_event_index;
+        tPerf = tic;
         try
             diagnostics.pupil = nparaxial_pupil_diagnostics_yu( ...
                 prescription, zFront, zRear, selectedEvent, tol);
         catch ME
             diagnostics.pupil_error = string(ME.message);
         end
+        perfTimer = nparaxial_perf_timer_yu( ...
+            "add_elapsed", perfTimer, "pupil/stop diagnostics", toc(tPerf));
 
+        tPerf = tic;
         try
             diagnostics.chief_marginal = nparaxial_chief_marginal_rays_yu( ...
                 prescription, z_obj, y_field, z_img, selectedEvent, tol);
         catch ME
             diagnostics.chief_error = string(ME.message);
         end
+        perfTimer = nparaxial_perf_timer_yu( ...
+            "add_elapsed", perfTimer, "chief/marginal diagnostics", toc(tPerf));
 
         if ~isempty(diagnostics.chief_marginal)
+            tPerf = tic;
             try
                 diagnostics.invariant = nparaxial_lagrange_invariant_yu( ...
                     diagnostics.chief_marginal, tol);
@@ -105,6 +124,8 @@ function diagnostics = nparaxial_field_diagnostics_yu( ...
             catch ME
                 diagnostics.invariant_error = string(ME.message);
             end
+            perfTimer = nparaxial_perf_timer_yu( ...
+                "add_elapsed", perfTimer, "invariant diagnostics", toc(tPerf));
         end
     end
 end
