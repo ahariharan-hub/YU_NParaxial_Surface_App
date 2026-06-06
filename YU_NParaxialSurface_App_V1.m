@@ -36,6 +36,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         SurfaceCurvesCheckBox matlab.ui.control.CheckBox
         FirstSegmentPenaltyCheckBox matlab.ui.control.CheckBox
         SurfaceAngleSchematicCheckBox matlab.ui.control.CheckBox
+        CardinalPointsCheckBox matlab.ui.control.CheckBox
         ValiditySweepModeDropdown matlab.ui.control.DropDown
         ValiditySweepFieldMinField matlab.ui.control.NumericEditField
         ValiditySweepFieldMaxField matlab.ui.control.NumericEditField
@@ -300,7 +301,14 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'Value', false, ...
                 'ValueChangedFcn', @(~, ~) app.refreshRayDiagramDisplay());
             app.SurfaceAngleSchematicCheckBox.Layout.Row = 5;
-            app.SurfaceAngleSchematicCheckBox.Layout.Column = [1 2];
+            app.SurfaceAngleSchematicCheckBox.Layout.Column = 1;
+
+            app.CardinalPointsCheckBox = uicheckbox(app.PrescriptionButtonGrid, ...
+                'Text', 'Show cardinal points', ...
+                'Value', false, ...
+                'ValueChangedFcn', @(~, ~) app.handleCardinalPointsChanged());
+            app.CardinalPointsCheckBox.Layout.Row = 5;
+            app.CardinalPointsCheckBox.Layout.Column = 2;
 
             app.addPrescriptionButton('Add Thin Lens', 6, 1, ...
                 @(~, ~) app.addPrescriptionRow("thinlens"));
@@ -1284,6 +1292,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
             try
                 app.setStatus("Tracing...", false);
+                app.clearCardinalPointOverlay();
                 drawnow limitrate
 
                 params = app.readParameters();
@@ -1355,6 +1364,17 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.setStatus("Ray diagram overlay display refreshed.", false);
         end
 
+        function handleCardinalPointsChanged(app)
+            if ~app.cardinalPointsEnabled()
+                app.clearCardinalPointOverlay();
+                drawnow limitrate
+                app.setStatus("Cardinal point overlay hidden.", false);
+                return
+            end
+
+            app.refreshRayDiagramDisplay();
+        end
+
         function markDirty(app, reason)
             app.IsDirty = true;
             app.clearResults();
@@ -1371,6 +1391,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
             staleText = {'Inputs changed. Run Trace to refresh diagnostics.'};
             if ~isempty(app.RayAxes) && isvalid(app.RayAxes)
+                app.clearCardinalPointOverlay();
                 cla(app.RayAxes);
                 title(app.RayAxes, 'Run Trace to refresh diagnostics');
                 xlabel(app.RayAxes, 'z');
@@ -2368,6 +2389,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
 
         function plotRayDiagram(app)
             ax = app.RayAxes;
+            app.clearCardinalPointOverlay();
             cla(ax);
             hold(ax, 'on');
             grid(ax, 'on');
@@ -2482,6 +2504,10 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 text(ax, data.img.z_img, yLim(2), ' Virtual image', ...
                     'VerticalAlignment', 'top', ...
                     'Color', [0.45 0.25 0.65]);
+            end
+
+            if app.cardinalPointsEnabled()
+                app.drawCardinalPointOverlay(ax, data, yLim, xLimits);
             end
 
             if app.firstSegmentPenaltyEnabled()
@@ -2656,6 +2682,30 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
                 'VerticalAlignment', 'bottom');
         end
 
+        function drawCardinalPointOverlay(app, ax, data, yLim, xLimits)
+            if ~isfield(data, 'diagnostics') || ...
+                    ~isfield(data.diagnostics, 'cardinal') || ...
+                    isempty(data.diagnostics.cardinal)
+                app.clearCardinalPointOverlay();
+                return
+            end
+
+            try
+                nparaxial_plot_cardinal_points_yu( ...
+                    ax, data.diagnostics.cardinal, yLim, xLimits);
+            catch ME
+                app.setStatus("Cardinal point overlay error: " + ...
+                    string(ME.message), true);
+            end
+        end
+
+        function nDeleted = clearCardinalPointOverlay(app)
+            nDeleted = 0;
+            if ~isempty(app.RayAxes) && isvalid(app.RayAxes)
+                nDeleted = nparaxial_clear_cardinal_points_yu(app.RayAxes);
+            end
+        end
+
         function tf = surfaceCurvesEnabled(app)
             tf = ~isempty(app.SurfaceCurvesCheckBox) && ...
                 isvalid(app.SurfaceCurvesCheckBox) && app.SurfaceCurvesCheckBox.Value;
@@ -2671,6 +2721,12 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             tf = ~isempty(app.SurfaceAngleSchematicCheckBox) && ...
                 isvalid(app.SurfaceAngleSchematicCheckBox) && ...
                 app.SurfaceAngleSchematicCheckBox.Value;
+        end
+
+        function tf = cardinalPointsEnabled(app)
+            tf = ~isempty(app.CardinalPointsCheckBox) && ...
+                isvalid(app.CardinalPointsCheckBox) && ...
+                app.CardinalPointsCheckBox.Value;
         end
 
         function styles = rayStylesForBundle(~, bundleSetItem)
