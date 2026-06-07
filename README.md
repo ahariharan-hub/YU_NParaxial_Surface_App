@@ -4,13 +4,11 @@ MATLAB educational ray-tracing tools for **first-order meridional paraxial optic
 
 The repository is built around a prescription-driven `y-u` model for optical systems in the `y-z` meridional plane. It is intended for learning and debugging Gaussian optics, ABCD matrix propagation, stops and pupils, paraxial surface refraction, relay systems, telecentric systems, and simple grating-source launch conditions.
 
-Current public-facing state: **Milestone 2.6.3+**.
+Current public-facing state: **V2 lightweight system viewer with structured classical use cases**.
 
-## Recommended entry points
+## Main entry point
 
-### V2 lightweight system viewer
-
-Use V2 for normal exploration:
+Use the V2 app for normal exploration:
 
 ```matlab
 addpath(genpath(pwd))
@@ -25,7 +23,7 @@ V2 is intentionally compact and has five tabs:
 4. **Stop/Pupils**
 5. **Equations**
 
-V2 focuses on fast first-order layout exploration. It does not run the heavier paraxial-validity or field-sweep diagnostic tools.
+The public app is centered on V2. Earlier full-diagnostic V1 development artifacts are not part of the current public-facing app state.
 
 ## Optical model
 
@@ -168,7 +166,7 @@ Only propagating orders are traced. Non-propagating orders are reported but not 
 
 ## System diagnostics
 
-The apps compute and display first-order diagnostics, including:
+V2 computes and displays first-order diagnostics, including:
 
 - system ABCD matrix,
 - chronological matrix chain,
@@ -200,7 +198,7 @@ For finite-power systems, the cardinal helper reports the usual first-order foca
 
 ## Plotting and UI notes
 
-Recent V2 plotting/UI changes include:
+Recent V2 plotting/UI features include:
 
 - role-based ray styling,
 - de-duplicated legends,
@@ -219,7 +217,7 @@ V2 keeps a single global **Run Trace** button. Prescription load/save is availab
 Important folders and files:
 
 ```text
-YU_NParaxialSurface_App_V2.m          lightweight system viewer
+YU_NParaxialSurface_App_V2.m          lightweight public system viewer
 core/                                 paraxial model, case library, tracing, diagnostics
 plotting/                             plot helpers and visual styles
 workflows/                            scriptable trace/validity/field-sweep workflows
@@ -238,7 +236,7 @@ core/nparaxial_make_collimated_rays_yu.m
 
 ## Scriptable workflows
 
-The app logic is also available through scriptable workflows under `workflows/`, including trace, validity, and field-sweep workflows. V2 uses the lightweight trace path; heavier diagnostics remain available through workflow scripts.
+The app logic is also available through scriptable workflows under `workflows/`, including trace, validity, and field-sweep workflows. The public V2 app uses the lightweight trace path; workflow scripts retain access to deeper diagnostic paths for scripted studies.
 
 Typical pattern:
 
