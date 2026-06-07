@@ -64,6 +64,10 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
 
         Data struct
         SelectedPrescriptionRows double = []
+        DefaultCaseLabels string = strings(0, 1)
+        DefaultCaseKeys string = strings(0, 1)
+        CurrentCase struct = struct()
+        CurrentCaseKey string = ""
     end
 
     methods (Access = private)
@@ -90,6 +94,7 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 return
             end
 
+            app.configureDefaultCaseDropdown();
             app.loadDefaults();
             app.setStatus("Edit the prescription, then press Run Trace.", false);
         end
@@ -614,34 +619,89 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             button.Layout.Column = column;
         end
 
+        function configureDefaultCaseDropdown(app)
+            try
+                cases = nparaxial_default_case_library_yu();
+                labels = strings(numel(cases), 1);
+                keys = strings(numel(cases), 1);
+                for k = 1:numel(cases)
+                    labels(k) = app.caseDisplayLabel(cases(k));
+                    keys(k) = string(cases(k).key);
+                end
+                app.DefaultCaseLabels = labels;
+                app.DefaultCaseKeys = keys;
+                app.PresetDropdown.Items = cellstr(labels);
+                defaultCase = nparaxial_get_default_case_yu();
+                app.PresetDropdown.Value = char(app.caseDisplayLabel(defaultCase));
+            catch ME
+                app.setStatus("Default case library error: " + ...
+                    string(ME.message), true);
+            end
+        end
+
+        function label = caseDisplayLabel(~, caseDef)
+            if isfield(caseDef, 'display_name') && ...
+                    strlength(string(caseDef.display_name)) > 0
+                label = string(caseDef.display_name);
+            else
+                label = string(caseDef.family) + " - " + ...
+                    string(caseDef.name);
+            end
+        end
+
         function loadDefaults(app)
+            if isempty(app.DefaultCaseLabels)
+                app.configureDefaultCaseDropdown();
+            end
             app.ObjectTypeDropdown.Value = 'Point object';
-            app.FieldModeDropdown.Value = 'Single field y';
-            app.ObjectZField.Value = -120;
-            app.DiagnosticFieldField.Value = 0;
-            app.FieldMinYField.Value = -5;
-            app.FieldMaxYField.Value = 5;
-            app.FieldCountField.Value = 3;
-            app.RayCountField.Value = 9;
             app.GratingWavelengthField.Value = 0.193;
             app.GratingPeriodField.Value = 4.0;
             app.GratingIncidentAngleField.Value = 0;
             app.GratingOrdersField.Value = '-2:2';
             app.GratingNInField.Value = 1.0;
             app.GratingNOutField.Value = 1.0;
-            app.RayFanModeDropdown.Value = 'Manual fixed-angle fan';
-            app.ManualUMaxField.Value = 0.04;
             app.ShowElementLabelsCheckBox.Value = true;
             app.ElementLabelStyleDropdown.Value = 'Compact';
-            app.PresetDropdown.Value = 'Two thin lenses';
-            app.PrescriptionTable.Data = nparaxial_default_prescription_yu();
+            app.applyDefaultCase(nparaxial_get_default_case_yu(), ...
+                'Run Trace to refresh V2 system view.');
+            app.TimingLabel.Text = 'Run time: --';
+        end
+
+        function applyDefaultCase(app, caseDef, clearMessage)
+            prescription = nparaxial_validate_prescription_yu( ...
+                caseDef.prescription);
+
+            label = app.caseDisplayLabel(caseDef);
+            if ~isempty(app.PresetDropdown) && isvalid(app.PresetDropdown) && ...
+                    any(string(app.PresetDropdown.Items) == label)
+                app.PresetDropdown.Value = char(label);
+            end
+
+            sourceMode = string(caseDef.source_mode);
+            if sourceMode == "grating"
+                app.ObjectTypeDropdown.Value = 'Grating object';
+            else
+                app.ObjectTypeDropdown.Value = 'Point object';
+            end
+
+            app.ObjectZField.Value = double(caseDef.launch_z);
+            app.FieldModeDropdown.Value = char(caseDef.field_mode);
+            app.DiagnosticFieldField.Value = double(caseDef.field_y);
+            app.FieldMinYField.Value = double(caseDef.field_min_y);
+            app.FieldMaxYField.Value = double(caseDef.field_max_y);
+            app.FieldCountField.Value = max(1, round(double(caseDef.field_count)));
+            app.RayCountField.Value = max(3, round(double(caseDef.n_rays)));
+            app.RayFanModeDropdown.Value = char(caseDef.ray_fan_mode);
+            app.ManualUMaxField.Value = double(caseDef.u_max);
+            app.PrescriptionTable.Data = table_to_prescription_yu(prescription);
             app.SelectedPrescriptionRows = [];
             app.Data = struct();
+            app.CurrentCase = caseDef;
+            app.CurrentCaseKey = string(caseDef.key);
             app.updateObjectModeControls();
             app.updateFieldModeControls();
             app.updateElementLabelControls();
-            app.clearDisplays('Run Trace to refresh V2 system view.');
-            app.TimingLabel.Text = 'Run time: --';
+            app.clearDisplays(clearMessage);
         end
 
         function fieldModeChanged(app)
@@ -721,24 +781,13 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
 
         function loadSelectedPreset(app)
             try
-                prescription = nparaxial_default_prescription_yu( ...
+                caseDef = nparaxial_get_default_case_yu( ...
                     app.PresetDropdown.Value);
-                app.PrescriptionTable.Data = table_to_prescription_yu(prescription);
-                app.FieldModeDropdown.Value = 'Single field y';
-                app.updateFieldModeControls();
-                if string(app.PresetDropdown.Value) == ...
-                        "Homogeneous translation / free-space propagation"
-                    app.ObjectZField.Value = 0;
-                    app.DiagnosticFieldField.Value = 1;
-                else
-                    app.ObjectZField.Value = -120;
-                    app.DiagnosticFieldField.Value = 0;
-                end
-                app.SelectedPrescriptionRows = [];
-                app.Data = struct();
-                app.clearDisplays('Preset loaded. Run Trace to refresh V2.');
-                app.setStatus("Loaded default prescription: " + ...
-                    string(app.PresetDropdown.Value) + ".", false);
+                app.applyDefaultCase(caseDef, ...
+                    'Default case loaded. Run Trace to refresh V2.');
+                app.setStatus("Loaded default case: " + ...
+                    app.caseDisplayLabel(caseDef) + ". " + ...
+                    string(caseDef.teaching_point), false);
             catch ME
                 app.setStatus("Load default error: " + string(ME.message), true);
             end
@@ -879,10 +928,14 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                     'tol', 1e-12);
                 if raySettings.object_type == "Grating object"
                     data = app.runGratingTrace(prescription, raySettings, opts);
+                elseif raySettings.source_mode == "collimated"
+                    data = app.runCollimatedTrace( ...
+                        prescription, raySettings, opts);
                 else
                     data = nparaxial_run_trace_workflow_yu( ...
                         prescription, raySettings, opts);
                     data.object_type = "Point object";
+                    data.source_mode = "point";
                     data.gratingInfo = [];
                 end
                 data = app.annotateTraceFieldsV2(data);
@@ -907,6 +960,11 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                             data.gratingInfo.n_propagating, ...
                             data.gratingInfo.n_nonpropagating), false);
                     end
+                elseif raySettings.source_mode == "collimated"
+                    app.setStatus(sprintf( ...
+                        'Collimated source traced from %d launch height(s). Image: %s', ...
+                        numel(raySettings.field_heights), ...
+                        char(string(data.image.type))), false);
                 else
                     app.setStatus(sprintf( ...
                         'V2 lightweight trace complete: %d field(s). Image: %s', ...
@@ -918,6 +976,181 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 app.clearDisplays('Trace failed.');
                 app.setStatus("V2 trace error: " + string(ME.message), true);
             end
+        end
+
+        function data = runCollimatedTrace(app, prescription, raySettings, opts)
+            tol = opts.tol;
+            img = app.collimatedImageV2( ...
+                prescription, raySettings.z_obj, tol);
+            zTrace = img.trace_z_final;
+            if ~isscalar(zTrace) || ~isfinite(zTrace) || ...
+                    zTrace < raySettings.z_obj
+                error('Collimated trace z_final must be finite and after launch_z.');
+            end
+
+            matrixChain = nparaxial_matrix_chain_yu( ...
+                prescription, raySettings.z_obj, zTrace);
+            fieldHeights = raySettings.field_heights(:);
+            rays = nparaxial_make_collimated_rays_yu( ...
+                raySettings.z_obj, fieldHeights, ...
+                raySettings.field_angle_rad);
+            rays.field_index = (1:height(rays)).';
+            rays.y_field = rays.y0;
+            if height(rays) > 0
+                rays.name = "collimated_" + rays.name;
+                rays.ray_name = rays.name;
+                bundle = nparaxial_trace_bundle_yu( ...
+                    rays, prescription, zTrace);
+            else
+                bundle = app.emptyTraceBundleV2();
+            end
+
+            bundleSet = struct();
+            bundleSet.field_index = 1;
+            bundleSet.y_obj = NaN;
+            bundleSet.y_field = NaN;
+            bundleSet.rays = rays;
+            bundleSet.bundle = bundle;
+            bundleSet.ray_fan_info = rays.Properties.UserData;
+
+            elements = nparaxial_enabled_elements_yu(prescription);
+            cardinal = [];
+            cardinalError = "";
+            try
+                cardinal = nparaxial_cardinal_points_yu( ...
+                    prescription, elements.z(1), elements.z(end), tol);
+            catch ME
+                cardinalError = string(ME.message);
+            end
+
+            stopPupil = [];
+            stopPupilError = "";
+            try
+                stopPupil = app.computeStopPupilV2( ...
+                    prescription, raySettings.z_obj, tol);
+            catch ME
+                stopPupilError = string(ME.message);
+            end
+
+            data = struct();
+            data.prescription = prescription;
+            data.raySettings = raySettings;
+            data.opts = opts;
+            data.rays = rays;
+            data.bundle = bundle;
+            data.bundleSet = bundleSet;
+            data.rayFanInfo = bundleSet.ray_fan_info;
+            data.eventSequence = nparaxial_event_sequence_yu(prescription);
+            data.systemMatrix = img.M_ref;
+            data.traceMatrix = matrixChain.final_matrix;
+            data.matrixChain = matrixChain;
+            data.image = img;
+            data.trace_z_final = zTrace;
+            data.cardinal = cardinal;
+            data.cardinal_error = cardinalError;
+            data.stopPupil = stopPupil;
+            data.stop_pupil_error = stopPupilError;
+            data.validity = [];
+            data.validity_error = "";
+            data.performance_timer = [];
+            data.performance_log = table();
+            data.timing = strings(0, 1);
+            data.status = "Collimated source trace completed.";
+            data.object_type = "Point object";
+            data.source_mode = "collimated";
+            data.gratingInfo = [];
+        end
+
+        function img = collimatedImageV2(~, prescription, zLaunch, tol)
+            if nargin < 4 || isempty(tol)
+                tol = 1e-12;
+            end
+            elements = nparaxial_enabled_elements_yu(prescription);
+            if isempty(elements)
+                error('At least one enabled element is required.');
+            end
+            zRef = max(elements.z);
+            if zRef <= zLaunch
+                error('The final enabled element must be after launch_z.');
+            end
+
+            MRef = nparaxial_system_matrix_yu(prescription, zLaunch, zRef);
+            A = MRef(1, 1);
+            B = MRef(1, 2);
+            C = MRef(2, 1);
+            D = MRef(2, 2);
+
+            img = struct();
+            img.z_obj = zLaunch;
+            img.z_ref = zRef;
+            img.M_ref = MRef;
+            img.A_ref = A;
+            img.B_ref = B;
+            img.C_ref = C;
+            img.D_ref = D;
+            img.isFinite = false;
+            img.isReal = false;
+            img.isVirtual = false;
+            img.isAtInfinity = true;
+            img.is_finite = false;
+            img.is_real = false;
+            img.is_virtual = false;
+            img.is_at_infinity = true;
+            img.type = "collimated / afocal output";
+            img.image_type = img.type;
+            img.x_after_ref = Inf;
+            img.x_from_reference = Inf;
+            img.z_img = Inf;
+            img.z_image = Inf;
+            img.trace_z_final = zRef;
+            img.M_img = NaN(2, 2);
+            img.A_img = NaN;
+            img.B_img = NaN;
+            img.C_img = NaN;
+            img.D_img = NaN;
+            img.m = NaN;
+            img.B_residual = NaN;
+            img.note = 'Collimated input uses A + xC = 0 for finite focus.';
+            img.message = string(img.note);
+
+            if abs(C) <= tol
+                return
+            end
+
+            x = -A / C;
+            zImage = zRef + x;
+            if ~isfinite(zImage)
+                return
+            end
+
+            img.is_finite = true;
+            img.is_at_infinity = false;
+            img.isFinite = true;
+            img.isAtInfinity = false;
+            img.x_after_ref = x;
+            img.x_from_reference = x;
+            img.z_img = zImage;
+            img.z_image = zImage;
+            if x >= 0
+                img.type = "finite real image";
+                img.is_real = true;
+                img.isReal = true;
+                img.trace_z_final = zImage;
+            else
+                img.type = "finite virtual image";
+                img.is_virtual = true;
+                img.isVirtual = true;
+                img.trace_z_final = zRef;
+            end
+            img.image_type = img.type;
+            T = [1, x; 0, 1];
+            img.M_img = T * MRef;
+            img.A_img = img.M_img(1, 1);
+            img.B_img = img.M_img(1, 2);
+            img.C_img = img.M_img(2, 1);
+            img.D_img = img.M_img(2, 2);
+            img.m = NaN;
+            img.B_residual = img.M_img(1, 1);
         end
 
         function data = runGratingTrace(app, prescription, raySettings, opts)
@@ -1035,6 +1268,7 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             data.timing = strings(0, 1);
             data.status = string(gratingInfo.status_text);
             data.object_type = "Grating object";
+            data.source_mode = "grating";
             data.gratingInfo = gratingInfo;
         end
 
@@ -1073,6 +1307,8 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
 
             raySettings = struct();
             raySettings.object_type = string(app.ObjectTypeDropdown.Value);
+            raySettings.source_mode = app.currentSourceMode();
+            raySettings.field_angle_rad = app.currentFieldAngleRad();
             raySettings.z_obj = app.ObjectZField.Value;
             raySettings.field_mode = string(app.FieldModeDropdown.Value);
             raySettings.field_heights = app.readFieldHeights();
@@ -1088,6 +1324,33 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 app.GratingOrdersField.Value);
             raySettings.n_in = app.GratingNInField.Value;
             raySettings.n_out = app.GratingNOutField.Value;
+        end
+
+        function sourceMode = currentSourceMode(app)
+            if string(app.ObjectTypeDropdown.Value) == "Grating object"
+                sourceMode = "grating";
+                return
+            end
+
+            sourceMode = "point";
+            if isstruct(app.CurrentCase) && isfield(app.CurrentCase, ...
+                    'source_mode') && strlength(string(app.CurrentCaseKey)) > 0
+                sourceMode = string(app.CurrentCase.source_mode);
+                if sourceMode == "grating"
+                    sourceMode = "point";
+                end
+            end
+        end
+
+        function fieldAngleRad = currentFieldAngleRad(app)
+            fieldAngleRad = 0;
+            if isstruct(app.CurrentCase) && isfield(app.CurrentCase, ...
+                    'field_angle_rad')
+                fieldAngleRad = double(app.CurrentCase.field_angle_rad);
+            end
+            if ~isscalar(fieldAngleRad) || ~isfinite(fieldAngleRad)
+                fieldAngleRad = 0;
+            end
         end
 
         function fieldHeights = readFieldHeights(app)
@@ -1140,6 +1403,10 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 data.bundleSet(q).field_index = q;
                 data.bundleSet(q).y_obj = yField;
                 data.bundleSet(q).y_field = yField;
+                if isfield(data, 'source_mode') && ...
+                        string(data.source_mode) == "collimated"
+                    continue
+                end
                 if isfield(data.bundleSet(q), 'rays') && ...
                         istable(data.bundleSet(q).rays)
                     data.bundleSet(q).rays = app.addRayFieldMetadata( ...
