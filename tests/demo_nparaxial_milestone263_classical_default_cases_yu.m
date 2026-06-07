@@ -145,6 +145,11 @@ function expected = expected_value_checks_local()
     assert_close_local(img.m, -2, '4f magnifier magnification');
     numChecks = numChecks + 1;
 
+    img = image_for_case_local("telecentric_doubly_4f_m_minus_0p25");
+    assert_close_local(img.z_img, 500,'doubly telecentric 4f m=-0.25 z image');
+    assert_close_local(img.m, -0.25,'doubly telecentric 4f m=-0.25 magnification');
+    numChecks = numChecks + 2;
+
     [C, D] = afocal_cd_local("afocal_keplerian_telescope");
     assert_close_local(C, 0, 'Keplerian C');
     assert_close_local(D, -2, 'Keplerian angular magnification');
@@ -244,6 +249,7 @@ function [status, numChecks, representativeRuns] = v2_case_smoke_local(rootFolde
     caseKeys = [
         "basic_single_lens_m_minus_0p5"
         "relay_4f_1to1"
+        "telecentric_doubly_4f_m_minus_0p25"
         "afocal_keplerian_telescope"
         "thick_biconvex"
         "debug_stop_clipping_demo"
