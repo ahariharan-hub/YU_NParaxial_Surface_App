@@ -23,9 +23,16 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
         StatusLabel matlab.ui.control.Label
         TimingLabel matlab.ui.control.Label
 
+        ObjectTypeDropdown matlab.ui.control.DropDown
         ObjectZField matlab.ui.control.NumericEditField
         DiagnosticFieldField matlab.ui.control.NumericEditField
         RayCountField matlab.ui.control.NumericEditField
+        GratingWavelengthField matlab.ui.control.NumericEditField
+        GratingPeriodField matlab.ui.control.NumericEditField
+        GratingIncidentAngleField matlab.ui.control.NumericEditField
+        GratingOrdersField matlab.ui.control.EditField
+        GratingNInField matlab.ui.control.NumericEditField
+        GratingNOutField matlab.ui.control.NumericEditField
         PresetDropdown matlab.ui.control.DropDown
         RayFanModeDropdown matlab.ui.control.DropDown
         ManualUMaxField matlab.ui.control.NumericEditField
@@ -140,32 +147,80 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             app.ControlPanel.Layout.Row = 2;
             app.ControlPanel.Layout.Column = 1;
 
-            app.ControlGrid = uigridlayout(app.ControlPanel, [9 2]);
+            app.ControlGrid = uigridlayout(app.ControlPanel, [17 2]);
             app.ControlGrid.ColumnWidth = {'1x', 110};
-            app.ControlGrid.RowHeight = {24, 30, 30, 30, 86, 30, 30, 30, '1x'};
+            app.ControlGrid.RowHeight = {22, 26, 26, 26, 26, 22, 26, 26, ...
+                26, 26, 26, 26, 26, 58, 26, 26, '1x'};
             app.ControlGrid.Padding = [10 10 10 10];
-            app.ControlGrid.RowSpacing = 6;
+            app.ControlGrid.RowSpacing = 4;
             app.ControlGrid.ColumnSpacing = 8;
 
             header = uilabel(app.ControlGrid, ...
-                'Text', 'Object and sampling', ...
+                'Text', 'Object/source', ...
                 'FontWeight', 'bold');
             header.Layout.Row = 1;
             header.Layout.Column = [1 2];
 
-            app.addControlLabel('Object plane z', 2);
-            app.ObjectZField = app.addNumericField(2, -120, ...
+            app.addControlLabel('Object type', 2);
+            app.ObjectTypeDropdown = uidropdown(app.ControlGrid, ...
+                'Items', {'Point object', 'Grating object'}, ...
+                'Value', 'Point object', ...
+                'Tag', 'nparaxial_v2_object_type', ...
+                'ValueChangedFcn', @(~, ~) app.objectTypeChanged());
+            app.ObjectTypeDropdown.Layout.Row = 2;
+            app.ObjectTypeDropdown.Layout.Column = 2;
+
+            app.addControlLabel('Object plane z', 3);
+            app.ObjectZField = app.addNumericField(3, -120, ...
                 'nparaxial_v2_object_z');
 
-            app.addControlLabel('Diagnostic field y', 3);
-            app.DiagnosticFieldField = app.addNumericField(3, 0, ...
+            app.addControlLabel('Object height y', 4);
+            app.DiagnosticFieldField = app.addNumericField(4, 0, ...
                 'nparaxial_v2_field_height');
 
-            app.addControlLabel('Rays per field', 4);
-            app.RayCountField = app.addNumericField(4, 9, ...
+            app.addControlLabel('Rays per field', 5);
+            app.RayCountField = app.addNumericField(5, 9, ...
                 'nparaxial_v2_ray_count');
             app.RayCountField.Limits = [3 Inf];
             app.RayCountField.RoundFractionalValues = 'on';
+
+            gratingHeader = uilabel(app.ControlGrid, ...
+                'Text', 'Grating object', ...
+                'FontWeight', 'bold');
+            gratingHeader.Layout.Row = 6;
+            gratingHeader.Layout.Column = [1 2];
+
+            app.addControlLabel('Wavelength [um]', 7);
+            app.GratingWavelengthField = app.addNumericField(7, 0.193, ...
+                'nparaxial_v2_grating_wavelength_um');
+            app.GratingWavelengthField.Limits = [eps Inf];
+
+            app.addControlLabel('Period [um]', 8);
+            app.GratingPeriodField = app.addNumericField(8, 4.0, ...
+                'nparaxial_v2_grating_period_um');
+            app.GratingPeriodField.Limits = [eps Inf];
+
+            app.addControlLabel('Incident angle [deg]', 9);
+            app.GratingIncidentAngleField = app.addNumericField(9, 0, ...
+                'nparaxial_v2_grating_incident_angle_deg');
+
+            app.addControlLabel('Orders', 10);
+            app.GratingOrdersField = uieditfield(app.ControlGrid, 'text', ...
+                'Value', '-2:2', ...
+                'Tag', 'nparaxial_v2_grating_orders', ...
+                'ValueChangedFcn', @(~, ~) app.requestTrace());
+            app.GratingOrdersField.Layout.Row = 10;
+            app.GratingOrdersField.Layout.Column = 2;
+
+            app.addControlLabel('n in', 11);
+            app.GratingNInField = app.addNumericField(11, 1.0, ...
+                'nparaxial_v2_grating_n_in');
+            app.GratingNInField.Limits = [eps Inf];
+
+            app.addControlLabel('n out', 12);
+            app.GratingNOutField = app.addNumericField(12, 1.0, ...
+                'nparaxial_v2_grating_n_out');
+            app.GratingNOutField.Limits = [eps Inf];
 
             note = uilabel(app.ControlGrid, ...
                 'Text', ['V2 is a lightweight first-order system viewer. ', ...
@@ -173,10 +228,10 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 'batch studies are available through script workflows.'], ...
                 'WordWrap', 'on', ...
                 'FontColor', [0.25 0.25 0.25]);
-            note.Layout.Row = 5;
+            note.Layout.Row = 14;
             note.Layout.Column = [1 2];
 
-            app.addControlLabel('Default prescription', 6);
+            app.addControlLabel('Default prescription', 15);
             app.PresetDropdown = uidropdown(app.ControlGrid, ...
                 'Items', { ...
                 'Single thin lens', ...
@@ -187,14 +242,14 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 'Value', 'Two thin lenses', ...
                 'Tag', 'nparaxial_v2_preset', ...
                 'ValueChangedFcn', @(~, ~) app.requestTrace());
-            app.PresetDropdown.Layout.Row = 6;
+            app.PresetDropdown.Layout.Row = 15;
             app.PresetDropdown.Layout.Column = 2;
 
             presetButton = uibutton(app.ControlGrid, 'push', ...
                 'Text', 'Load Default', ...
                 'Tag', 'nparaxial_v2_load_default', ...
                 'ButtonPushedFcn', @(~, ~) app.loadSelectedPreset());
-            presetButton.Layout.Row = 7;
+            presetButton.Layout.Row = 16;
             presetButton.Layout.Column = [1 2];
 
             app.TabGroup = uitabgroup(app.MainGrid, ...
@@ -486,17 +541,53 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
         end
 
         function loadDefaults(app)
+            app.ObjectTypeDropdown.Value = 'Point object';
             app.ObjectZField.Value = -120;
             app.DiagnosticFieldField.Value = 0;
             app.RayCountField.Value = 9;
+            app.GratingWavelengthField.Value = 0.193;
+            app.GratingPeriodField.Value = 4.0;
+            app.GratingIncidentAngleField.Value = 0;
+            app.GratingOrdersField.Value = '-2:2';
+            app.GratingNInField.Value = 1.0;
+            app.GratingNOutField.Value = 1.0;
             app.RayFanModeDropdown.Value = 'Manual fixed-angle fan';
             app.ManualUMaxField.Value = 0.04;
             app.PresetDropdown.Value = 'Two thin lenses';
             app.PrescriptionTable.Data = nparaxial_default_prescription_yu();
             app.SelectedPrescriptionRows = [];
             app.Data = struct();
+            app.updateObjectModeControls();
             app.clearDisplays('Run Trace to refresh V2 system view.');
             app.TimingLabel.Text = 'Run time: --';
+        end
+
+        function objectTypeChanged(app)
+            app.updateObjectModeControls();
+            app.requestTrace();
+        end
+
+        function updateObjectModeControls(app)
+            if isempty(app.ObjectTypeDropdown) || ~isvalid(app.ObjectTypeDropdown)
+                return
+            end
+            isGrating = string(app.ObjectTypeDropdown.Value) == "Grating object";
+            if isGrating
+                pointState = 'off';
+                gratingState = 'on';
+            else
+                pointState = 'on';
+                gratingState = 'off';
+            end
+            app.RayCountField.Enable = pointState;
+            app.RayFanModeDropdown.Enable = pointState;
+            app.ManualUMaxField.Enable = pointState;
+            app.GratingWavelengthField.Enable = gratingState;
+            app.GratingPeriodField.Enable = gratingState;
+            app.GratingIncidentAngleField.Enable = gratingState;
+            app.GratingOrdersField.Enable = gratingState;
+            app.GratingNInField.Enable = gratingState;
+            app.GratingNOutField.Enable = gratingState;
         end
 
         function resetDefaults(app)
@@ -559,9 +650,16 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                     'computeValidity', false, ...
                     'computeCardinal', true, ...
                     'computePupilStop', true, ...
-                    'timingEnabled', true);
-                data = nparaxial_run_trace_workflow_yu( ...
-                    prescription, raySettings, opts);
+                    'timingEnabled', true, ...
+                    'tol', 1e-12);
+                if raySettings.object_type == "Grating object"
+                    data = app.runGratingTrace(prescription, raySettings, opts);
+                else
+                    data = nparaxial_run_trace_workflow_yu( ...
+                        prescription, raySettings, opts);
+                    data.object_type = "Point object";
+                    data.gratingInfo = [];
+                end
                 data.run_trace_elapsed_s = toc(tRun);
                 data.enabledElements = nparaxial_enabled_elements_yu( ...
                     data.prescription);
@@ -571,13 +669,132 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 app.TimingLabel.Text = sprintf( ...
                     'Run time: %.4g s', data.run_trace_elapsed_s);
                 app.refreshSelectedTab();
-                app.setStatus("V2 lightweight trace complete. Image: " + ...
-                    string(data.image.type), false);
+                if raySettings.object_type == "Grating object"
+                    if data.gratingInfo.n_propagating == 0
+                        app.setStatus( ...
+                            "No propagating grating orders for current wavelength/period/order settings.", ...
+                            true);
+                    else
+                        app.setStatus(sprintf( ...
+                            'Grating object traced: %d propagating orders, %d non-propagating.', ...
+                            data.gratingInfo.n_propagating, ...
+                            data.gratingInfo.n_nonpropagating), false);
+                    end
+                else
+                    app.setStatus("V2 lightweight trace complete. Image: " + ...
+                        string(data.image.type), false);
+                end
             catch ME
                 app.Data = struct();
                 app.clearDisplays('Trace failed.');
                 app.setStatus("V2 trace error: " + string(ME.message), true);
             end
+        end
+
+        function data = runGratingTrace(app, prescription, raySettings, opts)
+            tol = opts.tol;
+            img = nparaxial_solve_image_plane_yu( ...
+                prescription, raySettings.z_obj, tol);
+            zTrace = img.trace_z_final;
+            if ~isscalar(zTrace) || ~isfinite(zTrace) || ...
+                    zTrace < raySettings.z_obj
+                error('Grating trace z_final must be finite and after z_obj.');
+            end
+
+            matrixChain = nparaxial_matrix_chain_yu( ...
+                prescription, raySettings.z_obj, zTrace);
+            [rays, gratingInfo] = nparaxial_make_grating_order_rays_yu( ...
+                raySettings.z_obj, raySettings.field_height, ...
+                raySettings.wavelength_um, ...
+                raySettings.grating_period_um, ...
+                raySettings.diffraction_orders, ...
+                raySettings.incident_angle_deg, ...
+                raySettings.n_in, raySettings.n_out);
+
+            if height(rays) > 0
+                bundle = nparaxial_trace_bundle_yu( ...
+                    rays, prescription, zTrace);
+            else
+                bundle = app.emptyTraceBundleV2();
+            end
+
+            elements = nparaxial_enabled_elements_yu(prescription);
+            cardinal = [];
+            cardinalError = "";
+            try
+                cardinal = nparaxial_cardinal_points_yu( ...
+                    prescription, elements.z(1), elements.z(end), tol);
+            catch ME
+                cardinalError = string(ME.message);
+            end
+
+            stopPupil = [];
+            stopPupilError = "";
+            try
+                stopPupil = app.computeStopPupilV2( ...
+                    prescription, raySettings.z_obj, tol);
+            catch ME
+                stopPupilError = string(ME.message);
+            end
+
+            bundleSet = struct();
+            bundleSet.field_index = 1;
+            bundleSet.y_obj = raySettings.field_height;
+            bundleSet.rays = rays;
+            bundleSet.bundle = bundle;
+            bundleSet.ray_fan_info = struct( ...
+                'mode', "Grating object", ...
+                'status_text', string(gratingInfo.status_text));
+
+            data = struct();
+            data.prescription = prescription;
+            data.raySettings = raySettings;
+            data.opts = opts;
+            data.rays = rays;
+            data.bundle = bundle;
+            data.bundleSet = bundleSet;
+            data.rayFanInfo = bundleSet.ray_fan_info;
+            data.eventSequence = nparaxial_event_sequence_yu(prescription);
+            data.systemMatrix = img.M_ref;
+            data.traceMatrix = matrixChain.final_matrix;
+            data.matrixChain = matrixChain;
+            data.image = img;
+            data.trace_z_final = zTrace;
+            data.cardinal = cardinal;
+            data.cardinal_error = cardinalError;
+            data.stopPupil = stopPupil;
+            data.stop_pupil_error = stopPupilError;
+            data.validity = [];
+            data.validity_error = "";
+            data.performance_timer = [];
+            data.performance_log = table();
+            data.timing = strings(0, 1);
+            data.status = string(gratingInfo.status_text);
+            data.object_type = "Grating object";
+            data.gratingInfo = gratingInfo;
+        end
+
+        function stopPupil = computeStopPupilV2(~, prescription, zObj, tol)
+            elements = nparaxial_enabled_elements_yu(prescription);
+            stopPupil = struct();
+            stopPupil.stop = nparaxial_select_aperture_stop_yu( ...
+                prescription, zObj, 0, tol);
+            stopPupil.pupil = [];
+            if ~isempty(stopPupil.stop) && stopPupil.stop.has_stop
+                stopPupil.pupil = nparaxial_pupil_diagnostics_yu( ...
+                    prescription, elements.z(1), elements.z(end), ...
+                    stopPupil.stop.selected_event_index, tol);
+            end
+        end
+
+        function bundle = emptyTraceBundleV2(~)
+            bundle = struct( ...
+                'name', {}, ...
+                'ray_in', {}, ...
+                'res', {}, ...
+                'trc', {}, ...
+                'yf', {}, ...
+                'uf', {});
         end
 
         function raySettings = readRaySettings(app)
@@ -591,11 +808,66 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             app.RayCountField.Value = nRays;
 
             raySettings = struct();
+            raySettings.object_type = string(app.ObjectTypeDropdown.Value);
             raySettings.z_obj = app.ObjectZField.Value;
             raySettings.field_height = app.DiagnosticFieldField.Value;
             raySettings.n_rays = nRays;
             raySettings.fan_mode = string(app.RayFanModeDropdown.Value);
             raySettings.u_max = app.ManualUMaxField.Value;
+            raySettings.wavelength_um = app.GratingWavelengthField.Value;
+            raySettings.grating_period_um = app.GratingPeriodField.Value;
+            raySettings.incident_angle_deg = ...
+                app.GratingIncidentAngleField.Value;
+            raySettings.diffraction_orders = app.parseDiffractionOrders( ...
+                app.GratingOrdersField.Value);
+            raySettings.n_in = app.GratingNInField.Value;
+            raySettings.n_out = app.GratingNOutField.Value;
+        end
+
+        function orders = parseDiffractionOrders(~, value)
+            text = strtrim(char(string(value)));
+            if isempty(text)
+                error('Diffraction orders must not be empty.');
+            end
+            clean = regexprep(text, '[\[\]\(\)]', ' ');
+            if contains(clean, ':')
+                rangeText = regexprep(clean, '\s+', '');
+                parts = strsplit(rangeText, ':');
+                if numel(parts) ~= 2 && numel(parts) ~= 3
+                    error('Order range must use start:stop or start:step:stop.');
+                end
+                nums = str2double(parts);
+                if any(~isfinite(nums))
+                    error('Order range contains a nonnumeric value.');
+                end
+                if numel(nums) == 2
+                    if nums(1) <= nums(2)
+                        step = 1;
+                    else
+                        step = -1;
+                    end
+                    orders = (nums(1):step:nums(2)).';
+                else
+                    if nums(2) == 0
+                        error('Order range step must be nonzero.');
+                    end
+                    orders = (nums(1):nums(2):nums(3)).';
+                end
+            else
+                clean = regexprep(clean, '[,;]', ' ');
+                parts = regexp(strtrim(clean), '\s+', 'split');
+                orders = str2double(parts(:));
+            end
+
+            orders = double(orders(:));
+            orders = orders(isfinite(orders));
+            if isempty(orders)
+                error('Diffraction orders must contain at least one integer.');
+            end
+            if any(abs(orders - round(orders)) > eps)
+                error('Diffraction orders must be integers.');
+            end
+            orders = unique(round(orders), 'sorted');
         end
 
         function refreshSelectedTab(app)
@@ -803,6 +1075,10 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                     'HandleVisibility', 'off');
             end
 
+            if isfield(data, 'object_type') && ...
+                    string(data.object_type) == "Grating object"
+                app.drawGratingOrderLabels(ax, data, yLim, xLimits);
+            end
             if app.CardinalPointsCheckBox.Value && ~isempty(data.cardinal)
                 nparaxial_plot_cardinal_points_yu(ax, data.cardinal, yLim, xLimits);
             end
@@ -816,8 +1092,14 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
 
             xlabel(ax, 'z');
             ylabel(ax, 'y');
-            title(ax, "V2 lightweight paraxial ray trace - " + ...
-                string(data.raySettings.fan_mode));
+            if isfield(data, 'object_type') && ...
+                    string(data.object_type) == "Grating object"
+                titleText = "V2 lightweight paraxial ray trace - grating object";
+            else
+                titleText = "V2 lightweight paraxial ray trace - " + ...
+                    string(data.raySettings.fan_mode);
+            end
+            title(ax, titleText);
             if app.LegendCheckBox.Value
                 [legendHandles, legendNames] = nparaxial_legend_unique_yu( ...
                     legendHandles, legendNames);
@@ -926,6 +1208,56 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                     'VerticalAlignment', 'top', ...
                     'Color', color, ...
                     'HandleVisibility', 'off');
+            end
+        end
+
+        function drawGratingOrderLabels(app, ax, data, yLim, xLimits)
+            if ~isfield(data, 'bundleSet') || isempty(data.bundleSet)
+                return
+            end
+            ySpan = diff(yLim);
+            if ySpan <= 0 || ~isfinite(ySpan)
+                ySpan = 1;
+            end
+            xSpan = diff(xLimits);
+            if xSpan <= 0 || ~isfinite(xSpan)
+                xSpan = 1;
+            end
+            for q = 1:numel(data.bundleSet)
+                if ~isfield(data.bundleSet(q), 'rays') || ...
+                        ~istable(data.bundleSet(q).rays)
+                    continue
+                end
+                rays = data.bundleSet(q).rays;
+                if ~ismember("diffraction_order", ...
+                        string(rays.Properties.VariableNames))
+                    continue
+                end
+                nRays = height(rays);
+                for r = 1:nRays
+                    z0 = rays.z0(r);
+                    y0 = rays.y0(r);
+                    u0 = rays.u0(r);
+                    xLabel = z0 + 0.035*xSpan;
+                    xLabel = min(max(xLabel, xLimits(1)), xLimits(2));
+                    yLabel = y0 + u0*(xLabel - z0);
+                    yLabel = yLabel + (r - (nRays + 1)/2)*0.025*ySpan;
+                    if ~isfinite(xLabel) || ~isfinite(yLabel)
+                        continue
+                    end
+                    yLabel = min(max(yLabel, yLim(1) + 0.04*ySpan), ...
+                        yLim(2) - 0.04*ySpan);
+                    text(ax, xLabel, yLabel, ...
+                        app.formatDiffractionOrderLabel( ...
+                        rays.diffraction_order(r)), ...
+                        'FontSize', 8, ...
+                        'FontWeight', 'bold', ...
+                        'Color', [0.18 0.18 0.18], ...
+                        'HorizontalAlignment', 'left', ...
+                        'VerticalAlignment', 'middle', ...
+                        'Tag', 'nparaxial_v2_grating_order_label', ...
+                        'HandleVisibility', 'off');
+                end
             end
         end
 
@@ -1046,10 +1378,28 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             status = "visible";
         end
 
-        function styles = rayStylesForBundle(~, bundleSetItem)
+        function styles = rayStylesForBundle(app, bundleSetItem)
             bundle = bundleSetItem.bundle;
             clipped = ~[bundle.trc].';
             if isfield(bundleSetItem, 'rays') && istable(bundleSetItem.rays)
+                rayColumns = string(bundleSetItem.rays.Properties.VariableNames);
+                if ismember("diffraction_order", rayColumns)
+                    n = numel(bundle);
+                    colors = lines(max(n, 1));
+                    color = colors(1:n, :);
+                    line_style = repmat("-", n, 1);
+                    line_style(clipped) = "--";
+                    display_name = strings(n, 1);
+                    for k = 1:n
+                        display_name(k) = app.formatDiffractionOrderLabel( ...
+                            bundleSetItem.rays.diffraction_order(k));
+                    end
+                    marker = repmat("x", n, 1);
+                    line_width = repmat(1.25, n, 1);
+                    styles = table(color, line_style, display_name, ...
+                        marker, line_width);
+                    return
+                end
                 styles = nparaxial_ray_role_style_yu(bundleSetItem.rays, clipped);
                 return
             end
@@ -1059,6 +1409,15 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             end
             rayTable = table(names, 'VariableNames', {'name'});
             styles = nparaxial_ray_role_style_yu(rayTable, clipped);
+        end
+
+        function label = formatDiffractionOrderLabel(~, orderValue)
+            orderValue = round(double(orderValue));
+            if orderValue > 0
+                label = "m = +" + string(orderValue);
+            else
+                label = "m = " + string(orderValue);
+            end
         end
 
         function updateSystemMatrix(app)
@@ -1075,6 +1434,14 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 sprintf('Image classification = %s', string(img.type))
                 sprintf('Transverse magnification m = %.6g', img.m)
                 ];
+            if isfield(data, 'object_type') && ...
+                    string(data.object_type) == "Grating object"
+                matrixLines = [
+                    matrixLines
+                    ""
+                    "Grating object is a source/ray-launch condition; it is not included in the ABCD system matrix."
+                    ];
+            end
             app.MatrixTextArea.Value = cellstr(matrixLines);
             app.MatrixChainTextArea.Value = cellstr( ...
                 nparaxial_matrix_chain_text_yu(data.matrixChain));
@@ -1130,6 +1497,11 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 };
             cardinalLines = [cardinalLines; focalLines(:); ...
                 {sprintf('Transverse magnification m = %.6g', img.m)}];
+            if isfield(data, 'object_type') && ...
+                    string(data.object_type) == "Grating object"
+                cardinalLines = [cardinalLines; { ...
+                    'Cardinal data are for the optical system only; grating changes launch angles/order rays.'}];
+            end
             app.CardinalTextArea.Value = cardinalLines;
             app.CardinalTable.Data = card.table;
         end
@@ -1417,6 +1789,20 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 '    H and H'' are first and second principal points.'
                 '    N and N'' are first and second nodal points.'
                 '    These come from the first-order ABCD matrix.'
+                ''
+                'Grating object / diffraction-order launch:'
+                '    n_out sin(theta_m) = n_in sin(theta_i) + m lambda / period'
+                ''
+                'Paraxial launch coordinate:'
+                '    u0 = theta_m  [radians]'
+                ''
+                'Normal incidence, same medium:'
+                '    sin(theta_m) = m lambda / period'
+                '    u_m approx m lambda / (n period)'
+                ''
+                'Grating note:'
+                '    The grating object is not an ABCD matrix element.'
+                '    It generates initial ray angles for each diffraction order.'
                 ''
                 'Heavy diagnostics:'
                 '    Paraxial validity diagnostics, field sweeps, reports, profiling,'
