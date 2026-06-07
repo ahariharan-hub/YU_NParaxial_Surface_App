@@ -143,7 +143,7 @@ function [status, numChecks, runTraceSeconds] = v2_app_smoke_local(rootFolder)
         'matlab.ui.control.DropDown', 'nparaxial_v2_preset');
     loadDefaultButton = find_by_tag_local(app.UIFigure, ...
         'matlab.ui.control.Button', 'nparaxial_v2_load_default');
-    presetDropdown.Value = 'Homogeneous translation / free-space propagation';
+    presetDropdown.Value = 'Debug - Homogeneous translation';
     call_callback_local(loadDefaultButton.ButtonPushedFcn, loadDefaultButton);
     call_callback_local(runButton.ButtonPushedFcn, runButton);
     drawnow limitrate
@@ -162,7 +162,7 @@ function [status, numChecks, runTraceSeconds] = v2_app_smoke_local(rootFolder)
         'Repeated identical V2 Run Trace calls should not accumulate graphics.');
     numChecks = numChecks + 1;
 
-    presetDropdown.Value = 'Two thin lenses';
+    presetDropdown.Value = 'Debug - Legacy two-thin-lens';
     call_callback_local(loadDefaultButton.ButtonPushedFcn, loadDefaultButton);
     call_callback_local(runButton.ButtonPushedFcn, runButton);
     drawnow limitrate
@@ -186,7 +186,7 @@ function [status, numChecks, runTraceSeconds] = v2_app_smoke_local(rootFolder)
         'V2 cardinal overlay should disappear when disabled.');
     numChecks = numChecks + 2;
 
-    presetDropdown.Value = 'Stop clipping demo';
+    presetDropdown.Value = 'Debug - Stop clipping demo';
     call_callback_local(loadDefaultButton.ButtonPushedFcn, loadDefaultButton);
     stopPupilCheck = find_by_tag_local(app.UIFigure, ...
         'matlab.ui.control.CheckBox', 'nparaxial_v2_show_stop_pupil_markers');
@@ -223,7 +223,7 @@ function [status, numChecks, runTraceSeconds] = v2_app_smoke_local(rootFolder)
     fitFocalCheck = find_by_tag_local(app.UIFigure, ...
         'matlab.ui.control.CheckBox', 'nparaxial_v2_fit_focal_length');
 
-    presetDropdown.Value = 'Single thin lens';
+    presetDropdown.Value = 'Basic - Single lens 1:1 imaging';
     call_callback_local(loadDefaultButton.ButtonPushedFcn, loadDefaultButton);
     focalCheck.Value = true;
     fitFocalCheck.Value = false;
@@ -249,7 +249,7 @@ function [status, numChecks, runTraceSeconds] = v2_app_smoke_local(rootFolder)
         'Repeated V2 Run Trace calls should not accumulate focal overlays.');
     numChecks = numChecks + 1;
 
-    presetDropdown.Value = 'Two thin lenses';
+    presetDropdown.Value = 'Debug - Legacy two-thin-lens';
     call_callback_local(loadDefaultButton.ButtonPushedFcn, loadDefaultButton);
     focalCheck.Value = true;
     fitFocalCheck.Value = false;
@@ -310,7 +310,7 @@ function [status, numChecks, runTraceSeconds] = v2_app_smoke_local(rootFolder)
     call_callback_local(focalCheck.ValueChangedFcn, focalCheck);
     drawnow limitrate
 
-    presetDropdown.Value = 'Two thin lenses';
+    presetDropdown.Value = 'Debug - Legacy two-thin-lens';
     call_callback_local(loadDefaultButton.ButtonPushedFcn, loadDefaultButton);
     call_callback_local(runButton.ButtonPushedFcn, runButton);
     drawnow limitrate

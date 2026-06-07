@@ -70,6 +70,12 @@ function prescription = nparaxial_default_prescription_yu(presetName)
                 1);
 
         otherwise
+            try
+                caseDef = nparaxial_get_default_case_yu(presetName);
+                prescription = caseDef.prescription;
+                return
+            catch
+            end
             error(['Unknown default prescription "%s". Valid choices are ', ...
                 'Single thin lens, Two thin lenses, Two-surface thick lens, ', ...
                 'Stop clipping demo, and Homogeneous translation / ', ...
