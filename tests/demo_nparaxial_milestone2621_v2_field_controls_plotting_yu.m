@@ -165,14 +165,9 @@ function [status, numChecks, pointSeconds, gratingSeconds] = ...
         'matlab.ui.control.DropDown', 'nparaxial_v2_element_label_style');
     ordersField = find_by_tag_local(app.UIFigure, ...
         'matlab.ui.control.EditField', 'nparaxial_v2_grating_orders');
-    loadCsvButton = find_by_tag_local(app.UIFigure, ...
-        'matlab.ui.control.Button', 'nparaxial_v2_load_prescription_csv');
-    saveCsvButton = find_by_tag_local(app.UIFigure, ...
-        'matlab.ui.control.Button', 'nparaxial_v2_save_prescription_csv');
-    loadMatButton = find_by_tag_local(app.UIFigure, ...
-        'matlab.ui.control.Button', 'nparaxial_v2_load_prescription_mat');
-    saveMatButton = find_by_tag_local(app.UIFigure, ...
-        'matlab.ui.control.Button', 'nparaxial_v2_save_prescription_mat');
+    rayControlsPanel = find_by_tag_local(app.UIFigure, ...
+        'matlab.ui.container.Panel', ...
+        'nparaxial_v2_ray_fan_prescription_panel');
     mainGrid = find_by_tag_local(app.UIFigure, ...
         'matlab.ui.container.GridLayout', 'nparaxial_v2_main_grid');
     controlGrid = find_by_tag_local(app.UIFigure, ...
@@ -191,11 +186,12 @@ function [status, numChecks, pointSeconds, gratingSeconds] = ...
         prescriptionButtonGrid);
     assert(isvalid(objectType) && isvalid(fieldMode) && ...
         isvalid(rayFanMode) && isvalid(labelStyle) && ...
-        isvalid(ordersField) && isvalid(loadCsvButton) && ...
-        isvalid(saveCsvButton) && isvalid(loadMatButton) && ...
-        isvalid(saveMatButton), ...
-        'Key controls and load/save buttons should exist.');
-    numChecks = numChecks + 1;
+        isvalid(ordersField), ...
+        'Key V2 controls should exist.');
+    assert_no_duplicate_action_buttons_local(rayControlsPanel);
+    assert_prescription_edit_buttons_local(rayControlsPanel);
+    assert_file_menu_prescription_actions_local(app.UIFigure);
+    numChecks = numChecks + 4;
 
     assert(all(ismember(["Single field y", "Y field sweep"], ...
         string(fieldMode.Items))) && ...
@@ -433,15 +429,15 @@ function assert_layout_dimensions_local(mainGrid, controlGrid, rayGrid, ...
         'V2 left control column should be widened.');
     assert(numeric_cell_value_local(controlGrid.ColumnWidth, 2) >= 155, ...
         'V2 trace control value column should be wide enough.');
-    assert(numeric_cell_value_local(rayGrid.RowHeight, 1) >= 470, ...
+    assert(numeric_cell_value_local(rayGrid.RowHeight, 1) >= 400, ...
         'Ray Diagram top controls should be tall enough.');
     assert(numeric_cell_value_local(rayTopGrid.ColumnWidth, 1) >= 450, ...
         'Ray fan/prescription controls should be wide enough.');
     assert(numeric_cell_value_local( ...
         prescriptionButtonGrid.ColumnWidth, 1) >= 160, ...
         'Prescription control label/button column should be wide enough.');
-    assert(numel(prescriptionButtonGrid.RowHeight) >= 15, ...
-        'Prescription controls should reserve rows for load/save buttons.');
+    assert(numel(prescriptionButtonGrid.RowHeight) == 12, ...
+        'Prescription controls should reserve only editing-control rows.');
 end
 
 
@@ -450,6 +446,66 @@ function value = numeric_cell_value_local(values, idx)
     if numel(values) >= idx && isnumeric(values{idx})
         value = double(values{idx});
     end
+end
+
+
+function assert_no_duplicate_action_buttons_local(panel)
+    buttonTexts = strings_from_controls_local(findall(panel, ...
+        '-isa', 'matlab.ui.control.Button'));
+    duplicateActions = ["Run Trace"; "Load CSV"; "Save CSV"; ...
+        "Load MAT"; "Save MAT"];
+    for k = 1:numel(duplicateActions)
+        assert(~any(buttonTexts == duplicateActions(k)), ...
+            'Ray Fan / Prescription Controls should not include %s.', ...
+            duplicateActions(k));
+    end
+end
+
+
+function assert_prescription_edit_buttons_local(panel)
+    buttonTexts = strings_from_controls_local(findall(panel, ...
+        '-isa', 'matlab.ui.control.Button'));
+    expectedButtons = [
+        "Add Thin Lens"
+        "Add Surface"
+        "Add Stop"
+        "Add Dummy"
+        "Duplicate Row"
+        "Delete Selected Row"
+        "Sort Prescription"
+        "Check Prescription"
+        ];
+    for k = 1:numel(expectedButtons)
+        assert(any(buttonTexts == expectedButtons(k)), ...
+            'Prescription editing button %s should remain.', ...
+            expectedButtons(k));
+    end
+end
+
+
+function assert_file_menu_prescription_actions_local(fig)
+    menuTexts = strings_from_controls_local(findall(fig, 'Type', 'uimenu'));
+    expectedMenus = [
+        "Load prescription CSV"
+        "Save prescription CSV"
+        "Load prescription MAT"
+        "Save prescription MAT"
+        ];
+    for k = 1:numel(expectedMenus)
+        assert(any(menuTexts == expectedMenus(k)), ...
+            'File menu item %s should remain.', expectedMenus(k));
+    end
+end
+
+
+function values = strings_from_controls_local(handles)
+    values = strings(numel(handles), 1);
+    for k = 1:numel(handles)
+        if isprop(handles(k), 'Text')
+            values(k) = string(handles(k).Text);
+        end
+    end
+    values = values(values ~= "");
 end
 
 
