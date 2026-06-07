@@ -9,6 +9,7 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
         RootFolder string
         CoreFolder string
         WorkflowsFolder string
+        PlottingFolder string
 
         MainGrid matlab.ui.container.GridLayout
         LeftGrid matlab.ui.container.GridLayout
@@ -24,8 +25,12 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
         TimingLabel matlab.ui.control.Label
 
         ObjectTypeDropdown matlab.ui.control.DropDown
+        FieldModeDropdown matlab.ui.control.DropDown
         ObjectZField matlab.ui.control.NumericEditField
         DiagnosticFieldField matlab.ui.control.NumericEditField
+        FieldMinYField matlab.ui.control.NumericEditField
+        FieldMaxYField matlab.ui.control.NumericEditField
+        FieldCountField matlab.ui.control.NumericEditField
         RayCountField matlab.ui.control.NumericEditField
         GratingWavelengthField matlab.ui.control.NumericEditField
         GratingPeriodField matlab.ui.control.NumericEditField
@@ -41,6 +46,8 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
         SystemFocalLengthCheckBox matlab.ui.control.CheckBox
         FitFocalLengthCheckBox matlab.ui.control.CheckBox
         StopPupilMarkersCheckBox matlab.ui.control.CheckBox
+        ShowElementLabelsCheckBox matlab.ui.control.CheckBox
+        ElementLabelStyleDropdown matlab.ui.control.DropDown
         LegendCheckBox matlab.ui.control.CheckBox
 
         PrescriptionTable matlab.ui.control.Table
@@ -65,6 +72,7 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             app.RootFolder = string(fileparts(mfilename('fullpath')));
             app.CoreFolder = fullfile(app.RootFolder, "core");
             app.WorkflowsFolder = fullfile(app.RootFolder, "workflows");
+            app.PlottingFolder = fullfile(app.RootFolder, "plotting");
 
             if exist(app.CoreFolder, 'dir')
                 addpath(app.CoreFolder);
@@ -75,6 +83,12 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             if exist(app.WorkflowsFolder, 'dir')
                 addpath(app.WorkflowsFolder);
             end
+            if exist(app.PlottingFolder, 'dir')
+                addpath(app.PlottingFolder);
+            else
+                app.setStatus("Plotting helper folder was not found.", true);
+                return
+            end
 
             app.loadDefaults();
             app.setStatus("Edit the prescription, then press Run Trace.", false);
@@ -83,12 +97,12 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
         function createComponents(app)
             app.UIFigure = uifigure( ...
                 'Name', 'Y-U N Paraxial Surface App V2', ...
-                'Position', [70 70 1240 780], ...
+                'Position', [70 70 1360 840], ...
                 'Color', [0.97 0.97 0.96]);
             app.createMenus();
 
             app.MainGrid = uigridlayout(app.UIFigure, [1 2]);
-            app.MainGrid.ColumnWidth = {290, '1x'};
+            app.MainGrid.ColumnWidth = {360, '1x'};
             app.MainGrid.RowHeight = {'1x'};
             app.MainGrid.Padding = [10 10 10 10];
             app.MainGrid.ColumnSpacing = 10;
@@ -147,13 +161,14 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             app.ControlPanel.Layout.Row = 2;
             app.ControlPanel.Layout.Column = 1;
 
-            app.ControlGrid = uigridlayout(app.ControlPanel, [17 2]);
-            app.ControlGrid.ColumnWidth = {'1x', 110};
-            app.ControlGrid.RowHeight = {22, 26, 26, 26, 26, 22, 26, 26, ...
-                26, 26, 26, 26, 26, 58, 26, 26, '1x'};
+            app.ControlGrid = uigridlayout(app.ControlPanel, [20 2]);
+            app.ControlGrid.ColumnWidth = {'1x', 160};
+            app.ControlGrid.RowHeight = {22, 26, 26, 26, 26, 26, 26, ...
+                26, 26, 22, 26, 26, 26, 26, 26, 26, 58, 26, 28, '1x'};
             app.ControlGrid.Padding = [10 10 10 10];
             app.ControlGrid.RowSpacing = 4;
             app.ControlGrid.ColumnSpacing = 8;
+            app.ControlGrid.Tag = 'nparaxial_v2_control_grid';
 
             header = uilabel(app.ControlGrid, ...
                 'Text', 'Object/source', ...
@@ -174,12 +189,35 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             app.ObjectZField = app.addNumericField(3, -120, ...
                 'nparaxial_v2_object_z');
 
-            app.addControlLabel('Object height y', 4);
-            app.DiagnosticFieldField = app.addNumericField(4, 0, ...
+            app.addControlLabel('Field mode', 4);
+            app.FieldModeDropdown = uidropdown(app.ControlGrid, ...
+                'Items', {'Single field y', 'Y field sweep'}, ...
+                'Value', 'Single field y', ...
+                'Tag', 'nparaxial_v2_field_mode', ...
+                'ValueChangedFcn', @(~, ~) app.fieldModeChanged());
+            app.FieldModeDropdown.Layout.Row = 4;
+            app.FieldModeDropdown.Layout.Column = 2;
+
+            app.addControlLabel('Field y [mm]', 5);
+            app.DiagnosticFieldField = app.addNumericField(5, 0, ...
                 'nparaxial_v2_field_height');
 
-            app.addControlLabel('Rays per field', 5);
-            app.RayCountField = app.addNumericField(5, 9, ...
+            app.addControlLabel('Field min y', 6);
+            app.FieldMinYField = app.addNumericField(6, -5, ...
+                'nparaxial_v2_field_min_y');
+
+            app.addControlLabel('Field max y', 7);
+            app.FieldMaxYField = app.addNumericField(7, 5, ...
+                'nparaxial_v2_field_max_y');
+
+            app.addControlLabel('Field count', 8);
+            app.FieldCountField = app.addNumericField(8, 3, ...
+                'nparaxial_v2_field_count');
+            app.FieldCountField.Limits = [1 Inf];
+            app.FieldCountField.RoundFractionalValues = 'on';
+
+            app.addControlLabel('Rays per field', 9);
+            app.RayCountField = app.addNumericField(9, 9, ...
                 'nparaxial_v2_ray_count');
             app.RayCountField.Limits = [3 Inf];
             app.RayCountField.RoundFractionalValues = 'on';
@@ -187,51 +225,51 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             gratingHeader = uilabel(app.ControlGrid, ...
                 'Text', 'Grating object', ...
                 'FontWeight', 'bold');
-            gratingHeader.Layout.Row = 6;
+            gratingHeader.Layout.Row = 10;
             gratingHeader.Layout.Column = [1 2];
 
-            app.addControlLabel('Wavelength [um]', 7);
-            app.GratingWavelengthField = app.addNumericField(7, 0.193, ...
+            app.addControlLabel('Wavelength [um]', 11);
+            app.GratingWavelengthField = app.addNumericField(11, 0.193, ...
                 'nparaxial_v2_grating_wavelength_um');
             app.GratingWavelengthField.Limits = [eps Inf];
 
-            app.addControlLabel('Period [um]', 8);
-            app.GratingPeriodField = app.addNumericField(8, 4.0, ...
+            app.addControlLabel('Period [um]', 12);
+            app.GratingPeriodField = app.addNumericField(12, 4.0, ...
                 'nparaxial_v2_grating_period_um');
             app.GratingPeriodField.Limits = [eps Inf];
 
-            app.addControlLabel('Incident angle [deg]', 9);
-            app.GratingIncidentAngleField = app.addNumericField(9, 0, ...
+            app.addControlLabel('Incident angle [deg]', 13);
+            app.GratingIncidentAngleField = app.addNumericField(13, 0, ...
                 'nparaxial_v2_grating_incident_angle_deg');
 
-            app.addControlLabel('Orders', 10);
+            app.addControlLabel('Orders', 14);
             app.GratingOrdersField = uieditfield(app.ControlGrid, 'text', ...
                 'Value', '-2:2', ...
                 'Tag', 'nparaxial_v2_grating_orders', ...
                 'ValueChangedFcn', @(~, ~) app.requestTrace());
-            app.GratingOrdersField.Layout.Row = 10;
+            app.GratingOrdersField.Layout.Row = 14;
             app.GratingOrdersField.Layout.Column = 2;
 
-            app.addControlLabel('n in', 11);
-            app.GratingNInField = app.addNumericField(11, 1.0, ...
+            app.addControlLabel('n in', 15);
+            app.GratingNInField = app.addNumericField(15, 1.0, ...
                 'nparaxial_v2_grating_n_in');
             app.GratingNInField.Limits = [eps Inf];
 
-            app.addControlLabel('n out', 12);
-            app.GratingNOutField = app.addNumericField(12, 1.0, ...
+            app.addControlLabel('n out', 16);
+            app.GratingNOutField = app.addNumericField(16, 1.0, ...
                 'nparaxial_v2_grating_n_out');
             app.GratingNOutField.Limits = [eps Inf];
 
             note = uilabel(app.ControlGrid, ...
                 'Text', ['V2 is a lightweight first-order system viewer. ', ...
-                'Heavy validity diagnostics, field sweeps, exports, and ', ...
+                'Heavy validity diagnostics, field-sweep diagnostics, exports, and ', ...
                 'batch studies are available through script workflows.'], ...
                 'WordWrap', 'on', ...
                 'FontColor', [0.25 0.25 0.25]);
-            note.Layout.Row = 14;
+            note.Layout.Row = 17;
             note.Layout.Column = [1 2];
 
-            app.addControlLabel('Default prescription', 15);
+            app.addControlLabel('Default prescription', 18);
             app.PresetDropdown = uidropdown(app.ControlGrid, ...
                 'Items', { ...
                 'Single thin lens', ...
@@ -242,14 +280,14 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 'Value', 'Two thin lenses', ...
                 'Tag', 'nparaxial_v2_preset', ...
                 'ValueChangedFcn', @(~, ~) app.requestTrace());
-            app.PresetDropdown.Layout.Row = 15;
+            app.PresetDropdown.Layout.Row = 18;
             app.PresetDropdown.Layout.Column = 2;
 
             presetButton = uibutton(app.ControlGrid, 'push', ...
                 'Text', 'Load Default', ...
                 'Tag', 'nparaxial_v2_load_default', ...
                 'ButtonPushedFcn', @(~, ~) app.loadSelectedPreset());
-            presetButton.Layout.Row = 16;
+            presetButton.Layout.Row = 19;
             presetButton.Layout.Column = [1 2];
 
             app.TabGroup = uitabgroup(app.MainGrid, ...
@@ -271,6 +309,18 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 'MenuSelectedFcn', @(~, ~) app.runTrace());
             uimenu(fileMenu, 'Text', 'Reset Defaults', ...
                 'MenuSelectedFcn', @(~, ~) app.resetDefaults());
+            uimenu(fileMenu, ...
+                'Text', 'Load prescription CSV', ...
+                'Separator', 'on', ...
+                'MenuSelectedFcn', @(~, ~) app.loadPrescriptionCsvDialog());
+            uimenu(fileMenu, 'Text', 'Save prescription CSV', ...
+                'MenuSelectedFcn', @(~, ~) app.savePrescriptionCsvDialog());
+            uimenu(fileMenu, ...
+                'Text', 'Load prescription MAT', ...
+                'Separator', 'on', ...
+                'MenuSelectedFcn', @(~, ~) app.loadPrescriptionMatDialog());
+            uimenu(fileMenu, 'Text', 'Save prescription MAT', ...
+                'MenuSelectedFcn', @(~, ~) app.savePrescriptionMatDialog());
 
             viewMenu = uimenu(app.UIFigure, 'Text', 'View');
             for title = ["Ray Diagram", "System Matrix", ...
@@ -283,18 +333,20 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
         function createRayDiagramTab(app)
             rayTab = uitab(app.TabGroup, 'Title', 'Ray Diagram');
             rayGrid = uigridlayout(rayTab, [2 1]);
-            rayGrid.RowHeight = {335, '1x'};
+            rayGrid.RowHeight = {480, '1x'};
             rayGrid.ColumnWidth = {'1x'};
             rayGrid.Padding = [8 8 8 8];
             rayGrid.RowSpacing = 8;
+            rayGrid.Tag = 'nparaxial_v2_ray_grid';
 
             rayTopGrid = uigridlayout(rayGrid, [1 2]);
             rayTopGrid.Layout.Row = 1;
             rayTopGrid.Layout.Column = 1;
-            rayTopGrid.ColumnWidth = {330, '1x'};
+            rayTopGrid.ColumnWidth = {455, '1x'};
             rayTopGrid.RowHeight = {'1x'};
             rayTopGrid.Padding = [0 0 0 0];
             rayTopGrid.ColumnSpacing = 8;
+            rayTopGrid.Tag = 'nparaxial_v2_ray_top_grid';
 
             controlsPanel = uipanel(rayTopGrid, ...
                 'Title', 'Ray Fan / Prescription Controls', ...
@@ -303,13 +355,16 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             controlsPanel.Layout.Row = 1;
             controlsPanel.Layout.Column = 1;
 
-            app.PrescriptionButtonGrid = uigridlayout(controlsPanel, [11 2]);
+            app.PrescriptionButtonGrid = uigridlayout(controlsPanel, [15 2]);
             app.PrescriptionButtonGrid.RowHeight = ...
-                {22, 22, 20, 22, 22, 22, 25, 25, 25, 25, 28};
-            app.PrescriptionButtonGrid.ColumnWidth = {'1x', '1x'};
+                {24, 24, 20, 24, 24, 24, 24, 22, 26, 26, ...
+                26, 26, 30, 30, 30};
+            app.PrescriptionButtonGrid.ColumnWidth = {165, '1x'};
             app.PrescriptionButtonGrid.Padding = [8 8 8 8];
             app.PrescriptionButtonGrid.RowSpacing = 4;
             app.PrescriptionButtonGrid.ColumnSpacing = 6;
+            app.PrescriptionButtonGrid.Tag = ...
+                'nparaxial_v2_prescription_button_grid';
 
             rayFanLabel = uilabel(app.PrescriptionButtonGrid, ...
                 'Text', 'Ray fan mode', ...
@@ -393,24 +448,54 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             app.FitFocalLengthCheckBox.Layout.Row = 6;
             app.FitFocalLengthCheckBox.Layout.Column = 2;
 
-            app.addPrescriptionButton('Add Thin Lens', 7, 1, ...
+            app.ShowElementLabelsCheckBox = uicheckbox( ...
+                app.PrescriptionButtonGrid, ...
+                'Text', 'Show element labels', ...
+                'Value', true, ...
+                'Tag', 'nparaxial_v2_show_element_labels', ...
+                'ValueChangedFcn', @(~, ~) app.elementLabelControlChanged());
+            app.ShowElementLabelsCheckBox.Layout.Row = 7;
+            app.ShowElementLabelsCheckBox.Layout.Column = 1;
+
+            app.ElementLabelStyleDropdown = uidropdown( ...
+                app.PrescriptionButtonGrid, ...
+                'Items', {'Compact', 'Detailed', 'Off'}, ...
+                'Value', 'Compact', ...
+                'Tag', 'nparaxial_v2_element_label_style', ...
+                'ValueChangedFcn', @(~, ~) app.refreshRayDiagramDisplay());
+            app.ElementLabelStyleDropdown.Layout.Row = 7;
+            app.ElementLabelStyleDropdown.Layout.Column = 2;
+
+            app.addPrescriptionButton('Add Thin Lens', 9, 1, ...
                 @(~, ~) app.addPrescriptionRow("thinlens"));
-            app.addPrescriptionButton('Add Surface', 7, 2, ...
+            app.addPrescriptionButton('Add Surface', 9, 2, ...
                 @(~, ~) app.addPrescriptionRow("surface"));
-            app.addPrescriptionButton('Add Stop', 8, 1, ...
+            app.addPrescriptionButton('Add Stop', 10, 1, ...
                 @(~, ~) app.addPrescriptionRow("stop"));
-            app.addPrescriptionButton('Add Dummy', 8, 2, ...
+            app.addPrescriptionButton('Add Dummy', 10, 2, ...
                 @(~, ~) app.addPrescriptionRow("dummy"));
-            app.addPrescriptionButton('Duplicate Row', 9, 1, ...
+            app.addPrescriptionButton('Duplicate Row', 11, 1, ...
                 @(~, ~) app.duplicatePrescriptionRow());
-            app.addPrescriptionButton('Delete Selected Row', 9, 2, ...
+            app.addPrescriptionButton('Delete Selected Row', 11, 2, ...
                 @(~, ~) app.deleteSelectedPrescriptionRows());
-            app.addPrescriptionButton('Sort Prescription', 10, 1, ...
+            app.addPrescriptionButton('Sort Prescription', 12, 1, ...
                 @(~, ~) app.sortPrescriptionTable());
-            app.addPrescriptionButton('Check Prescription', 10, 2, ...
+            app.addPrescriptionButton('Check Prescription', 12, 2, ...
                 @(~, ~) app.checkPrescription());
-            app.addPrescriptionButton('Run Trace', 11, [1 2], ...
-                @(~, ~) app.runTrace());
+            app.addPrescriptionButton('Run Trace', 13, [1 2], ...
+                @(~, ~) app.runTrace(), 'nparaxial_v2_run_trace_secondary');
+            app.addPrescriptionButton('Load CSV', 14, 1, ...
+                @(~, ~) app.loadPrescriptionCsvDialog(), ...
+                'nparaxial_v2_load_prescription_csv');
+            app.addPrescriptionButton('Save CSV', 14, 2, ...
+                @(~, ~) app.savePrescriptionCsvDialog(), ...
+                'nparaxial_v2_save_prescription_csv');
+            app.addPrescriptionButton('Load MAT', 15, 1, ...
+                @(~, ~) app.loadPrescriptionMatDialog(), ...
+                'nparaxial_v2_load_prescription_mat');
+            app.addPrescriptionButton('Save MAT', 15, 2, ...
+                @(~, ~) app.savePrescriptionMatDialog(), ...
+                'nparaxial_v2_save_prescription_mat');
 
             app.PrescriptionTable = uitable(rayTopGrid);
             app.PrescriptionTable.Layout.Row = 1;
@@ -532,18 +617,26 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             field.Layout.Column = 2;
         end
 
-        function addPrescriptionButton(app, text, row, column, callback)
+        function button = addPrescriptionButton(app, text, row, column, ...
+                callback, tag)
             button = uibutton(app.PrescriptionButtonGrid, 'push', ...
                 'Text', text, ...
                 'ButtonPushedFcn', callback);
+            if nargin >= 6 && strlength(string(tag)) > 0
+                button.Tag = char(string(tag));
+            end
             button.Layout.Row = row;
             button.Layout.Column = column;
         end
 
         function loadDefaults(app)
             app.ObjectTypeDropdown.Value = 'Point object';
+            app.FieldModeDropdown.Value = 'Single field y';
             app.ObjectZField.Value = -120;
             app.DiagnosticFieldField.Value = 0;
+            app.FieldMinYField.Value = -5;
+            app.FieldMaxYField.Value = 5;
+            app.FieldCountField.Value = 3;
             app.RayCountField.Value = 9;
             app.GratingWavelengthField.Value = 0.193;
             app.GratingPeriodField.Value = 4.0;
@@ -553,13 +646,22 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             app.GratingNOutField.Value = 1.0;
             app.RayFanModeDropdown.Value = 'Manual fixed-angle fan';
             app.ManualUMaxField.Value = 0.04;
+            app.ShowElementLabelsCheckBox.Value = true;
+            app.ElementLabelStyleDropdown.Value = 'Compact';
             app.PresetDropdown.Value = 'Two thin lenses';
             app.PrescriptionTable.Data = nparaxial_default_prescription_yu();
             app.SelectedPrescriptionRows = [];
             app.Data = struct();
             app.updateObjectModeControls();
+            app.updateFieldModeControls();
+            app.updateElementLabelControls();
             app.clearDisplays('Run Trace to refresh V2 system view.');
             app.TimingLabel.Text = 'Run time: --';
+        end
+
+        function fieldModeChanged(app)
+            app.updateFieldModeControls();
+            app.requestTrace();
         end
 
         function objectTypeChanged(app)
@@ -590,6 +692,43 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             app.GratingNOutField.Enable = gratingState;
         end
 
+        function updateFieldModeControls(app)
+            if isempty(app.FieldModeDropdown) || ~isvalid(app.FieldModeDropdown)
+                return
+            end
+            isSweep = string(app.FieldModeDropdown.Value) == "Y field sweep";
+            if isSweep
+                singleState = 'off';
+                sweepState = 'on';
+            else
+                singleState = 'on';
+                sweepState = 'off';
+            end
+            app.DiagnosticFieldField.Enable = singleState;
+            app.FieldMinYField.Enable = sweepState;
+            app.FieldMaxYField.Enable = sweepState;
+            app.FieldCountField.Enable = sweepState;
+        end
+
+        function elementLabelControlChanged(app)
+            app.updateElementLabelControls();
+            app.refreshRayDiagramDisplay();
+        end
+
+        function updateElementLabelControls(app)
+            if isempty(app.ElementLabelStyleDropdown) || ...
+                    ~isvalid(app.ElementLabelStyleDropdown)
+                return
+            end
+            if isempty(app.ShowElementLabelsCheckBox) || ...
+                    ~isvalid(app.ShowElementLabelsCheckBox) || ...
+                    app.ShowElementLabelsCheckBox.Value
+                app.ElementLabelStyleDropdown.Enable = 'on';
+            else
+                app.ElementLabelStyleDropdown.Enable = 'off';
+            end
+        end
+
         function resetDefaults(app)
             app.loadDefaults();
             app.setStatus("Defaults loaded. Run Trace to refresh V2.", false);
@@ -600,6 +739,8 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 prescription = nparaxial_default_prescription_yu( ...
                     app.PresetDropdown.Value);
                 app.PrescriptionTable.Data = table_to_prescription_yu(prescription);
+                app.FieldModeDropdown.Value = 'Single field y';
+                app.updateFieldModeControls();
                 if string(app.PresetDropdown.Value) == ...
                         "Homogeneous translation / free-space propagation"
                     app.ObjectZField.Value = 0;
@@ -618,6 +759,89 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             end
         end
 
+        function loadPrescriptionCsvDialog(app)
+            try
+                filename = app.promptOpenFilename( ...
+                    {'*.csv', 'CSV prescription (*.csv)'}, ...
+                    'Load prescription CSV');
+                if strlength(filename) == 0
+                    app.setStatus("Load prescription CSV canceled.", false);
+                    return
+                end
+                app.loadPrescriptionCsv(filename);
+            catch ME
+                app.setStatus("Load prescription CSV error: " + ...
+                    string(ME.message), true);
+            end
+        end
+
+        function savePrescriptionCsvDialog(app)
+            try
+                filename = app.promptSaveFilename( ...
+                    {'*.csv', 'CSV prescription (*.csv)'}, ...
+                    'Save prescription CSV', 'prescription.csv');
+                if strlength(filename) == 0
+                    app.setStatus("Save prescription CSV canceled.", false);
+                    return
+                end
+                app.savePrescriptionCsv(filename);
+            catch ME
+                app.setStatus("Save prescription CSV error: " + ...
+                    string(ME.message), true);
+            end
+        end
+
+        function loadPrescriptionMatDialog(app)
+            try
+                filename = app.promptOpenFilename( ...
+                    {'*.mat', 'MAT prescription (*.mat)'}, ...
+                    'Load prescription MAT');
+                if strlength(filename) == 0
+                    app.setStatus("Load prescription MAT canceled.", false);
+                    return
+                end
+                app.loadPrescriptionMat(filename);
+            catch ME
+                app.setStatus("Load prescription MAT error: " + ...
+                    string(ME.message), true);
+            end
+        end
+
+        function savePrescriptionMatDialog(app)
+            try
+                filename = app.promptSaveFilename( ...
+                    {'*.mat', 'MAT prescription (*.mat)'}, ...
+                    'Save prescription MAT', 'prescription.mat');
+                if strlength(filename) == 0
+                    app.setStatus("Save prescription MAT canceled.", false);
+                    return
+                end
+                app.savePrescriptionMat(filename);
+            catch ME
+                app.setStatus("Save prescription MAT error: " + ...
+                    string(ME.message), true);
+            end
+        end
+
+        function filename = promptOpenFilename(~, filterSpec, titleText)
+            [file, path] = uigetfile(filterSpec, titleText);
+            if isequal(file, 0)
+                filename = "";
+            else
+                filename = string(fullfile(path, file));
+            end
+        end
+
+        function filename = promptSaveFilename(~, filterSpec, titleText, ...
+                defaultName)
+            [file, path] = uiputfile(filterSpec, titleText, defaultName);
+            if isequal(file, 0)
+                filename = "";
+            else
+                filename = string(fullfile(path, file));
+            end
+        end
+
         function checkPrescription(app)
             try
                 prescription = table_to_prescription_yu(app.PrescriptionTable.Data);
@@ -630,6 +854,22 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             catch ME
                 app.setStatus("Prescription error: " + string(ME.message), true);
             end
+        end
+
+        function prescription = validatedPrescriptionFromTable(app)
+            prescription = nparaxial_validate_prescription_yu( ...
+                app.PrescriptionTable.Data);
+            app.PrescriptionTable.Data = table_to_prescription_yu( ...
+                prescription);
+        end
+
+        function applyLoadedPrescription(app, prescription, message)
+            prescription = nparaxial_validate_prescription_yu(prescription);
+            app.PrescriptionTable.Data = table_to_prescription_yu( ...
+                prescription);
+            app.SelectedPrescriptionRows = [];
+            app.Data = struct();
+            app.clearDisplays(message);
         end
 
         function requestTrace(app)
@@ -660,6 +900,7 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                     data.object_type = "Point object";
                     data.gratingInfo = [];
                 end
+                data = app.annotateTraceFieldsV2(data);
                 data.run_trace_elapsed_s = toc(tRun);
                 data.enabledElements = nparaxial_enabled_elements_yu( ...
                     data.prescription);
@@ -676,13 +917,16 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                             true);
                     else
                         app.setStatus(sprintf( ...
-                            'Grating object traced: %d propagating orders, %d non-propagating.', ...
+                            'Grating object traced: %d field(s), %d propagating orders, %d non-propagating.', ...
+                            numel(raySettings.field_heights), ...
                             data.gratingInfo.n_propagating, ...
                             data.gratingInfo.n_nonpropagating), false);
                     end
                 else
-                    app.setStatus("V2 lightweight trace complete. Image: " + ...
-                        string(data.image.type), false);
+                    app.setStatus(sprintf( ...
+                        'V2 lightweight trace complete: %d field(s). Image: %s', ...
+                        numel(raySettings.field_heights), ...
+                        char(string(data.image.type))), false);
                 end
             catch ME
                 app.Data = struct();
@@ -703,19 +947,62 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
 
             matrixChain = nparaxial_matrix_chain_yu( ...
                 prescription, raySettings.z_obj, zTrace);
-            [rays, gratingInfo] = nparaxial_make_grating_order_rays_yu( ...
-                raySettings.z_obj, raySettings.field_height, ...
-                raySettings.wavelength_um, ...
-                raySettings.grating_period_um, ...
-                raySettings.diffraction_orders, ...
-                raySettings.incident_angle_deg, ...
-                raySettings.n_in, raySettings.n_out);
+            fieldHeights = raySettings.field_heights(:);
+            bundleSet = struct([]);
+            gratingInfo = [];
+            tracedRayCount = 0;
+            for k = 1:numel(fieldHeights)
+                yField = fieldHeights(k);
+                [rays, infoK] = nparaxial_make_grating_order_rays_yu( ...
+                    raySettings.z_obj, yField, ...
+                    raySettings.wavelength_um, ...
+                    raySettings.grating_period_um, ...
+                    raySettings.diffraction_orders, ...
+                    raySettings.incident_angle_deg, ...
+                    raySettings.n_in, raySettings.n_out);
+                rays = app.addRayFieldMetadata(rays, k, yField);
+                if height(rays) > 0
+                    rays.name = "field_" + string(k) + "_" + rays.name;
+                    rays.ray_name = rays.name;
+                    bundle = nparaxial_trace_bundle_yu( ...
+                        rays, prescription, zTrace);
+                else
+                    bundle = app.emptyTraceBundleV2();
+                end
 
-            if height(rays) > 0
-                bundle = nparaxial_trace_bundle_yu( ...
-                    rays, prescription, zTrace);
+                if k == 1
+                    gratingInfo = infoK;
+                end
+                tracedRayCount = tracedRayCount + height(rays);
+                bundleSet(k).field_index = k; %#ok<AGROW>
+                bundleSet(k).y_obj = yField; %#ok<AGROW>
+                bundleSet(k).y_field = yField; %#ok<AGROW>
+                bundleSet(k).rays = rays; %#ok<AGROW>
+                bundleSet(k).bundle = bundle; %#ok<AGROW>
+                bundleSet(k).ray_fan_info = struct( ...
+                    'mode', "Grating object", ...
+                    'status_text', string(infoK.status_text)); %#ok<AGROW>
+            end
+
+            if isempty(gratingInfo)
+                gratingInfo = struct( ...
+                    'order_table', table(), ...
+                    'n_propagating', 0, ...
+                    'n_nonpropagating', 0, ...
+                    'status_text', 'No grating fields were selected.');
+            end
+            gratingInfo.field_heights = fieldHeights;
+            gratingInfo.n_fields = numel(fieldHeights);
+            gratingInfo.n_traced_rays = tracedRayCount;
+            if isfield(gratingInfo, 'order_table') && ...
+                    istable(gratingInfo.order_table) && ...
+                    ismember("is_propagating", ...
+                    string(gratingInfo.order_table.Properties.VariableNames))
+                gratingInfo.propagating_orders = ...
+                    gratingInfo.order_table.diffraction_order( ...
+                    gratingInfo.order_table.is_propagating);
             else
-                bundle = app.emptyTraceBundleV2();
+                gratingInfo.propagating_orders = [];
             end
 
             elements = nparaxial_enabled_elements_yu(prescription);
@@ -737,23 +1024,15 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 stopPupilError = string(ME.message);
             end
 
-            bundleSet = struct();
-            bundleSet.field_index = 1;
-            bundleSet.y_obj = raySettings.field_height;
-            bundleSet.rays = rays;
-            bundleSet.bundle = bundle;
-            bundleSet.ray_fan_info = struct( ...
-                'mode', "Grating object", ...
-                'status_text', string(gratingInfo.status_text));
-
             data = struct();
             data.prescription = prescription;
             data.raySettings = raySettings;
             data.opts = opts;
-            data.rays = rays;
-            data.bundle = bundle;
+            data.rays = firstBundleSetValueLocal(bundleSet, "rays", table());
+            data.bundle = firstBundleSetValueLocal( ...
+                bundleSet, "bundle", app.emptyTraceBundleV2());
             data.bundleSet = bundleSet;
-            data.rayFanInfo = bundleSet.ray_fan_info;
+            data.rayFanInfo = [bundleSet.ray_fan_info].';
             data.eventSequence = nparaxial_event_sequence_yu(prescription);
             data.systemMatrix = img.M_ref;
             data.traceMatrix = matrixChain.final_matrix;
@@ -810,7 +1089,9 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             raySettings = struct();
             raySettings.object_type = string(app.ObjectTypeDropdown.Value);
             raySettings.z_obj = app.ObjectZField.Value;
-            raySettings.field_height = app.DiagnosticFieldField.Value;
+            raySettings.field_mode = string(app.FieldModeDropdown.Value);
+            raySettings.field_heights = app.readFieldHeights();
+            raySettings.field_height = raySettings.field_heights(1);
             raySettings.n_rays = nRays;
             raySettings.fan_mode = string(app.RayFanModeDropdown.Value);
             raySettings.u_max = app.ManualUMaxField.Value;
@@ -822,6 +1103,77 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 app.GratingOrdersField.Value);
             raySettings.n_in = app.GratingNInField.Value;
             raySettings.n_out = app.GratingNOutField.Value;
+        end
+
+        function fieldHeights = readFieldHeights(app)
+            if string(app.FieldModeDropdown.Value) == "Y field sweep"
+                nFields = round(app.FieldCountField.Value);
+                if ~isscalar(nFields) || ~isfinite(nFields) || nFields < 1
+                    nFields = 1;
+                end
+                app.FieldCountField.Value = nFields;
+                fieldMin = app.FieldMinYField.Value;
+                fieldMax = app.FieldMaxYField.Value;
+                if ~isfinite(fieldMin) || ~isfinite(fieldMax)
+                    error('Field min y and Field max y must be finite.');
+                end
+                if nFields == 1
+                    fieldHeights = mean([fieldMin, fieldMax]);
+                else
+                    fieldHeights = linspace(fieldMin, fieldMax, nFields).';
+                end
+            else
+                fieldY = app.DiagnosticFieldField.Value;
+                if ~isfinite(fieldY)
+                    error('Field y [mm] must be finite.');
+                end
+                fieldHeights = fieldY;
+            end
+            fieldHeights = double(fieldHeights(:));
+            if isempty(fieldHeights) || any(~isfinite(fieldHeights))
+                error('Selected y-field heights must be finite.');
+            end
+        end
+
+        function data = annotateTraceFieldsV2(app, data)
+            if ~isfield(data, 'bundleSet') || isempty(data.bundleSet)
+                return
+            end
+            for q = 1:numel(data.bundleSet)
+                yField = NaN;
+                if isfield(data.bundleSet(q), 'y_field') && ...
+                        ~isempty(data.bundleSet(q).y_field)
+                    yField = data.bundleSet(q).y_field;
+                elseif isfield(data.bundleSet(q), 'y_obj') && ...
+                        ~isempty(data.bundleSet(q).y_obj)
+                    yField = data.bundleSet(q).y_obj;
+                elseif isfield(data, 'raySettings') && ...
+                        isfield(data.raySettings, 'field_heights') && ...
+                        numel(data.raySettings.field_heights) >= q
+                    yField = data.raySettings.field_heights(q);
+                end
+                data.bundleSet(q).field_index = q;
+                data.bundleSet(q).y_obj = yField;
+                data.bundleSet(q).y_field = yField;
+                if isfield(data.bundleSet(q), 'rays') && ...
+                        istable(data.bundleSet(q).rays)
+                    data.bundleSet(q).rays = app.addRayFieldMetadata( ...
+                        data.bundleSet(q).rays, q, yField);
+                end
+            end
+            data.rays = firstBundleSetValueLocal(data.bundleSet, ...
+                "rays", table());
+            data.bundle = firstBundleSetValueLocal(data.bundleSet, ...
+                "bundle", app.emptyTraceBundleV2());
+        end
+
+        function rays = addRayFieldMetadata(~, rays, fieldIndex, yField)
+            if ~istable(rays)
+                return
+            end
+            nRows = height(rays);
+            rays.field_index = repmat(double(fieldIndex), nRows, 1);
+            rays.y_field = repmat(double(yField), nRows, 1);
         end
 
         function orders = parseDiffractionOrders(~, value)
@@ -1075,6 +1427,8 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                     'HandleVisibility', 'off');
             end
 
+            app.drawElementLabels(ax, data.enabledElements, yLim, xLimits);
+
             if isfield(data, 'object_type') && ...
                     string(data.object_type) == "Grating object"
                 app.drawGratingOrderLabels(ax, data, yLim, xLimits);
@@ -1175,11 +1529,99 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                     'MarkerSize', 5, 'HandleVisibility', 'off');
             end
 
-            text(ax, z, yLim(1), ...
-                " " + element.element_id(1) + " (" + typeName + ")", ...
-                'VerticalAlignment', 'bottom', ...
-                'Color', color, ...
-                'HandleVisibility', 'off');
+        end
+
+        function drawElementLabels(app, ax, elements, yLim, xLimits)
+            tag = 'nparaxial_v2_element_label';
+            hOld = findall(ax, 'Tag', tag);
+            if ~isempty(hOld)
+                delete(hOld(isgraphics(hOld)));
+            end
+            if isempty(elements) || ~istable(elements) || ...
+                    ~app.ShowElementLabelsCheckBox.Value
+                return
+            end
+
+            labelStyle = string(app.ElementLabelStyleDropdown.Value);
+            if labelStyle == "Off"
+                return
+            end
+
+            ySpan = diff(yLim);
+            if ySpan <= 0 || ~isfinite(ySpan)
+                ySpan = 1;
+            end
+            zSpan = diff(xLimits);
+            if zSpan <= 0 || ~isfinite(zSpan)
+                zSpan = 1;
+            end
+            closeTol = max(1e-9, 0.018*zSpan);
+            baseY = yLim(1) + 0.025*ySpan;
+            yStep = 0.055*ySpan;
+            xStep = 0.012*zSpan;
+
+            [zSorted, idx] = sort(double(elements.z));
+            groupNumbers = zeros(height(elements), 1);
+            groupStart = 1;
+            while groupStart <= numel(idx)
+                groupEnd = groupStart;
+                while groupEnd < numel(idx) && ...
+                        abs(zSorted(groupEnd + 1) - zSorted(groupStart)) <= closeTol
+                    groupEnd = groupEnd + 1;
+                end
+                groupIdx = idx(groupStart:groupEnd);
+                offsets = 0:(numel(groupIdx) - 1);
+                offsets = offsets - floor(numel(groupIdx)/2);
+                groupNumbers(groupIdx) = offsets(:);
+                groupStart = groupEnd + 1;
+            end
+
+            colorSet = lines(4);
+            for k = 1:height(elements)
+                z = double(elements.z(k));
+                if ~isfinite(z)
+                    continue
+                end
+                typeName = string(elements.type(k));
+                color = app.elementColor(typeName, colorSet);
+                offset = groupNumbers(k);
+                xLabel = min(max(z + offset*xStep, xLimits(1)), xLimits(2));
+                yLabel = min(max(baseY + abs(offset)*yStep, ...
+                    yLim(1) + 0.02*ySpan), yLim(2) - 0.04*ySpan);
+                text(ax, xLabel, yLabel, ...
+                    app.formatElementLabel(elements(k, :), labelStyle), ...
+                    'VerticalAlignment', 'bottom', ...
+                    'HorizontalAlignment', 'center', ...
+                    'Color', color, ...
+                    'FontSize', 8, ...
+                    'Interpreter', 'none', ...
+                    'Clipping', 'on', ...
+                    'Tag', tag, ...
+                    'HandleVisibility', 'off');
+            end
+        end
+
+        function label = formatElementLabel(~, element, labelStyle)
+            elementId = string(element.element_id(1));
+            if string(labelStyle) == "Detailed"
+                label = elementId + " " + elementTypeLabelLocal( ...
+                    string(element.type(1)));
+            else
+                label = elementId;
+            end
+        end
+
+        function color = elementColor(~, typeName, colorSet)
+            switch string(typeName)
+                case "thinlens"
+                    color = colorSet(1, :);
+                case "surface"
+                    color = colorSet(2, :);
+                case "stop"
+                    color = colorSet(3, :);
+                otherwise
+                    color = colorSet(4, :);
+            end
         end
 
         function drawStopPupilMarkers(app, ax, yLim, xLimits)
@@ -1384,20 +1826,15 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             if isfield(bundleSetItem, 'rays') && istable(bundleSetItem.rays)
                 rayColumns = string(bundleSetItem.rays.Properties.VariableNames);
                 if ismember("diffraction_order", rayColumns)
-                    n = numel(bundle);
-                    colors = lines(max(n, 1));
-                    color = colors(1:n, :);
-                    line_style = repmat("-", n, 1);
-                    line_style(clipped) = "--";
-                    display_name = strings(n, 1);
-                    for k = 1:n
-                        display_name(k) = app.formatDiffractionOrderLabel( ...
-                            bundleSetItem.rays.diffraction_order(k));
+                    propagatingOrders = [];
+                    if isfield(app.Data, 'gratingInfo') && ...
+                            isstruct(app.Data.gratingInfo) && ...
+                            isfield(app.Data.gratingInfo, 'propagating_orders')
+                        propagatingOrders = ...
+                            app.Data.gratingInfo.propagating_orders;
                     end
-                    marker = repmat("x", n, 1);
-                    line_width = repmat(1.25, n, 1);
-                    styles = table(color, line_style, display_name, ...
-                        marker, line_width);
+                    styles = nparaxial_grating_order_style_yu( ...
+                        bundleSetItem.rays, clipped, propagatingOrders);
                     return
                 end
                 styles = nparaxial_ray_role_style_yu(bundleSetItem.rays, clipped);
@@ -1826,6 +2263,34 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
 
     methods (Access = public)
 
+        function prescription = savePrescriptionCsv(app, filename)
+            prescription = app.validatedPrescriptionFromTable();
+            save_prescription_csv_yu(prescription, filename);
+            app.setStatus("Saved prescription CSV: " + string(filename), false);
+        end
+
+        function prescription = loadPrescriptionCsv(app, filename)
+            prescription = nparaxial_validate_prescription_yu( ...
+                load_prescription_csv_yu(filename));
+            app.applyLoadedPrescription(prescription, ...
+                'Prescription CSV loaded. Run Trace to refresh V2.');
+            app.setStatus("Loaded prescription CSV: " + string(filename), false);
+        end
+
+        function prescription = savePrescriptionMat(app, filename)
+            prescription = app.validatedPrescriptionFromTable();
+            save_prescription_mat_yu(prescription, filename);
+            app.setStatus("Saved prescription MAT: " + string(filename), false);
+        end
+
+        function prescription = loadPrescriptionMat(app, filename)
+            prescription = nparaxial_validate_prescription_yu( ...
+                load_prescription_mat_yu(filename));
+            app.applyLoadedPrescription(prescription, ...
+                'Prescription MAT loaded. Run Trace to refresh V2.');
+            app.setStatus("Loaded prescription MAT: " + string(filename), false);
+        end
+
         function app = YU_NParaxialSurface_App_V2
             createComponents(app);
             registerApp(app, app.UIFigure);
@@ -1871,4 +2336,28 @@ function T = clipToQuantityTableLocal(clip)
         sum(~clip.traced)
         ];
     T = table(quantity, value);
+end
+
+
+function value = firstBundleSetValueLocal(bundleSet, fieldName, defaultValue)
+    value = defaultValue;
+    if ~isempty(bundleSet) && isfield(bundleSet, fieldName)
+        value = bundleSet(1).(fieldName);
+    end
+end
+
+
+function label = elementTypeLabelLocal(typeName)
+    switch string(typeName)
+        case "thinlens"
+            label = "thin lens";
+        case "surface"
+            label = "surface";
+        case "stop"
+            label = "stop";
+        case "dummy"
+            label = "dummy";
+        otherwise
+            label = string(typeName);
+    end
 end

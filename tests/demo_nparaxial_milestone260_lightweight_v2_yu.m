@@ -6,6 +6,7 @@ function results = demo_nparaxial_milestone260_lightweight_v2_yu()
     addpath(rootFolder);
     addpath(fullfile(rootFolder, 'core'));
     addpath(fullfile(rootFolder, 'workflows'));
+    addpath(fullfile(rootFolder, 'plotting'));
     addpath(fullfile(rootFolder, 'examples'));
 
     numChecks = 0;
@@ -56,6 +57,7 @@ function [status, numChecks, runTraceSeconds] = v2_app_smoke_local(rootFolder)
     addpath(rootFolder);
     addpath(fullfile(rootFolder, 'core'));
     addpath(fullfile(rootFolder, 'workflows'));
+    addpath(fullfile(rootFolder, 'plotting'));
 
     app = YU_NParaxialSurface_App_V2();
     cleanupApp = onCleanup(@() delete(app)); %#ok<NASGU>
@@ -367,6 +369,7 @@ function [status, numChecks] = v1_smoke_local(rootFolder)
     addpath(rootFolder);
     addpath(fullfile(rootFolder, 'core'));
     addpath(fullfile(rootFolder, 'workflows'));
+    addpath(fullfile(rootFolder, 'plotting'));
 
     app = YU_NParaxialSurface_App_V1();
     cleanupApp = onCleanup(@() delete(app)); %#ok<NASGU>

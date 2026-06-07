@@ -5,6 +5,7 @@ function app = demo_launch_v2_lightweight_system_viewer_yu()
     addpath(rootFolder);
     addpath(fullfile(rootFolder, 'core'));
     addpath(fullfile(rootFolder, 'workflows'));
+    addpath(fullfile(rootFolder, 'plotting'));
 
     app = YU_NParaxialSurface_App_V2();
     if nargout == 0
