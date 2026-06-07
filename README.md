@@ -27,17 +27,6 @@ V2 is intentionally compact and has five tabs:
 
 V2 focuses on fast first-order layout exploration. It does not run the heavier paraxial-validity or field-sweep diagnostic tools.
 
-### V1 full diagnostic app
-
-Use V1 when you want the older full diagnostic workflow:
-
-```matlab
-addpath(genpath(pwd))
-app = YU_NParaxialSurface_App_V1;
-```
-
-V1 contains the extended diagnostic machinery developed during earlier milestones, including paraxial-validity diagnostics, field-sweep plots, and fuller report/export paths.
-
 ## Optical model
 
 Forward propagation is along increasing `z`. The ray state is
@@ -230,7 +219,6 @@ V2 keeps a single global **Run Trace** button. Prescription load/save is availab
 Important folders and files:
 
 ```text
-YU_NParaxialSurface_App_V1.m          full diagnostic app
 YU_NParaxialSurface_App_V2.m          lightweight system viewer
 core/                                 paraxial model, case library, tracing, diagnostics
 plotting/                             plot helpers and visual styles
@@ -250,7 +238,7 @@ core/nparaxial_make_collimated_rays_yu.m
 
 ## Scriptable workflows
 
-The app logic is also available through scriptable workflows under `workflows/`, including trace, validity, and field-sweep workflows. V2 uses the lightweight trace path; V1 and workflow scripts retain access to heavier diagnostics.
+The app logic is also available through scriptable workflows under `workflows/`, including trace, validity, and field-sweep workflows. V2 uses the lightweight trace path; heavier diagnostics remain available through workflow scripts.
 
 Typical pattern:
 

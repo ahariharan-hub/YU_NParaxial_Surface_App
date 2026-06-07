@@ -106,15 +106,11 @@ function results = demo_nparaxial_milestone263_classical_default_cases_yu()
     [v2Smoke, v2Checks, representativeRuns] = v2_case_smoke_local(rootFolder);
     numChecks = numChecks + v2Checks;
 
-    [v1Smoke, v1Checks] = v1_smoke_local(rootFolder);
-    numChecks = numChecks + v1Checks;
-
     results = struct();
     results.case_name = "milestone263_classical_default_cases";
     results.num_checks = numChecks;
     results.case_count = numel(cases);
     results.v2_smoke = v2Smoke;
-    results.v1_smoke = v1Smoke;
     results.default_case = newDefault.display_name;
     results.expected_values = expected;
     results.representative_v2_runs = representativeRuns;
@@ -275,34 +271,6 @@ function [status, numChecks, representativeRuns] = v2_case_smoke_local(rootFolde
     end
 
     status = "passed";
-end
-
-
-function [status, numChecks] = v1_smoke_local(rootFolder)
-    status = "skipped";
-    numChecks = 0;
-    if ~usejava('awt')
-        return
-    end
-
-    oldPath = path;
-    cleanupPath = onCleanup(@() path(oldPath)); %#ok<NASGU>
-    addpath(rootFolder);
-    addpath(fullfile(rootFolder, 'core'));
-    addpath(fullfile(rootFolder, 'workflows'));
-    addpath(fullfile(rootFolder, 'plotting'));
-
-    app = YU_NParaxialSurface_App_V1();
-    cleanupApp = onCleanup(@() delete(app)); %#ok<NASGU>
-    app.UIFigure.Visible = 'off';
-    runButton = findall(app.UIFigure, ...
-        '-isa', 'matlab.ui.control.Button', 'Text', 'Run Trace');
-    assert(~isempty(runButton), 'V1 should still launch with Run Trace.');
-    call_callback_local(runButton(1).ButtonPushedFcn, runButton(1));
-    drawnow limitrate
-    assert(isvalid(app.UIFigure), 'V1 smoke trace should leave the app valid.');
-    status = "passed";
-    numChecks = 1;
 end
 
 

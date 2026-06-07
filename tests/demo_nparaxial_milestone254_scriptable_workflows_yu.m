@@ -136,7 +136,8 @@ function [status, numChecks] = app_workflow_smoke_local(rootFolder)
     addpath(fullfile(rootFolder, 'core'));
     addpath(fullfile(rootFolder, 'workflows'));
 
-    app = YU_NParaxialSurface_App_V1();
+    status = "not_applicable_public_v2_tree";
+    return
     cleanupApp = onCleanup(@() delete(app)); %#ok<NASGU>
     app.UIFigure.Visible = 'off';
 

@@ -54,7 +54,8 @@ function [status, timingTable, reuseRatio, numChecks] = app_cache_smoke_local(ro
     addpath(rootFolder);
     addpath(fullfile(rootFolder, 'core'));
 
-    app = YU_NParaxialSurface_App_V1();
+    status = "not_applicable_public_v2_tree";
+    return
     cleanupApp = onCleanup(@() delete(app)); %#ok<NASGU>
     app.UIFigure.Visible = 'off';
 
