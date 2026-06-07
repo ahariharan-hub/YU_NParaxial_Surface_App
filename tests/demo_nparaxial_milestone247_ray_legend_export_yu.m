@@ -5,6 +5,7 @@ function results = demo_nparaxial_milestone247_ray_legend_export_yu()
     rootFolder = fileparts(testFolder);
     addpath(rootFolder);
     addpath(fullfile(rootFolder, 'core'));
+    addpath(fullfile(rootFolder, 'plotting'));
 
     numChecks = 0;
 

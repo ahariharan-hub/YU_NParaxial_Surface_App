@@ -6,6 +6,7 @@ function results = demo_nparaxial_milestone262_v2_grating_object_mode_yu()
     addpath(rootFolder);
     addpath(fullfile(rootFolder, 'core'));
     addpath(fullfile(rootFolder, 'workflows'));
+    addpath(fullfile(rootFolder, 'plotting'));
 
     numChecks = 0;
     v2File = fullfile(rootFolder, 'YU_NParaxialSurface_App_V2.m');
@@ -50,6 +51,7 @@ function [status, numChecks, pointSeconds, gratingSeconds] = ...
     addpath(rootFolder);
     addpath(fullfile(rootFolder, 'core'));
     addpath(fullfile(rootFolder, 'workflows'));
+    addpath(fullfile(rootFolder, 'plotting'));
 
     app = YU_NParaxialSurface_App_V2();
     cleanupApp = onCleanup(@() delete(app)); %#ok<NASGU>
@@ -207,6 +209,7 @@ function [status, numChecks] = v1_smoke_local(rootFolder)
     addpath(rootFolder);
     addpath(fullfile(rootFolder, 'core'));
     addpath(fullfile(rootFolder, 'workflows'));
+    addpath(fullfile(rootFolder, 'plotting'));
 
     app = YU_NParaxialSurface_App_V1();
     cleanupApp = onCleanup(@() delete(app)); %#ok<NASGU>

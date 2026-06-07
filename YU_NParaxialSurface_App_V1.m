@@ -12,6 +12,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
         RootFolder string
         CoreFolder string
         WorkflowsFolder string
+        PlottingFolder string
 
         MainGrid matlab.ui.container.GridLayout
         LeftGrid matlab.ui.container.GridLayout
@@ -94,6 +95,7 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             app.RootFolder = string(fileparts(mfilename('fullpath')));
             app.CoreFolder = fullfile(app.RootFolder, "core");
             app.WorkflowsFolder = fullfile(app.RootFolder, "workflows");
+            app.PlottingFolder = fullfile(app.RootFolder, "plotting");
 
             if exist(app.CoreFolder, 'dir')
                 addpath(app.CoreFolder);
@@ -103,6 +105,9 @@ classdef YU_NParaxialSurface_App_V1 < matlab.apps.AppBase
             end
             if exist(app.WorkflowsFolder, 'dir')
                 addpath(app.WorkflowsFolder);
+            end
+            if exist(app.PlottingFolder, 'dir')
+                addpath(app.PlottingFolder);
             end
 
             app.loadDefaults();

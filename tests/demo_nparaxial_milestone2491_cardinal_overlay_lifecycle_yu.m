@@ -5,6 +5,7 @@ function results = demo_nparaxial_milestone2491_cardinal_overlay_lifecycle_yu()
     rootFolder = fileparts(testFolder);
     addpath(rootFolder);
     addpath(fullfile(rootFolder, 'core'));
+    addpath(fullfile(rootFolder, 'plotting'));
 
     overlayTag = "nparaxial_cardinal_overlay";
     numChecks = 0;
@@ -115,6 +116,7 @@ function status = app_lifecycle_smoke_local(rootFolder, overlayTag)
     cleanupPath = onCleanup(@() path(oldPath)); %#ok<NASGU>
     addpath(rootFolder);
     addpath(fullfile(rootFolder, 'core'));
+    addpath(fullfile(rootFolder, 'plotting'));
 
     app = YU_NParaxialSurface_App_V1();
     cleanupApp = onCleanup(@() delete(app)); %#ok<NASGU>

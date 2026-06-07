@@ -5,6 +5,7 @@ function results = demo_nparaxial_milestone_ray_role_colors_yu()
     rootFolder = fileparts(testFolder);
     addpath(rootFolder);
     addpath(fullfile(rootFolder, 'core'));
+    addpath(fullfile(rootFolder, 'plotting'));
 
     blue = [0 0.4470 0.7410];
     red = [0.8500 0.0000 0.0000];
