@@ -333,7 +333,7 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
         function createRayDiagramTab(app)
             rayTab = uitab(app.TabGroup, 'Title', 'Ray Diagram');
             rayGrid = uigridlayout(rayTab, [2 1]);
-            rayGrid.RowHeight = {480, '1x'};
+            rayGrid.RowHeight = {410, '1x'};
             rayGrid.ColumnWidth = {'1x'};
             rayGrid.Padding = [8 8 8 8];
             rayGrid.RowSpacing = 8;
@@ -355,10 +355,9 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             controlsPanel.Layout.Row = 1;
             controlsPanel.Layout.Column = 1;
 
-            app.PrescriptionButtonGrid = uigridlayout(controlsPanel, [15 2]);
+            app.PrescriptionButtonGrid = uigridlayout(controlsPanel, [12 2]);
             app.PrescriptionButtonGrid.RowHeight = ...
-                {24, 24, 20, 24, 24, 24, 24, 22, 26, 26, ...
-                26, 26, 30, 30, 30};
+                {24, 24, 20, 24, 24, 24, 24, 22, 26, 26, 26, 26};
             app.PrescriptionButtonGrid.ColumnWidth = {165, '1x'};
             app.PrescriptionButtonGrid.Padding = [8 8 8 8];
             app.PrescriptionButtonGrid.RowSpacing = 4;
@@ -482,20 +481,6 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
                 @(~, ~) app.sortPrescriptionTable());
             app.addPrescriptionButton('Check Prescription', 12, 2, ...
                 @(~, ~) app.checkPrescription());
-            app.addPrescriptionButton('Run Trace', 13, [1 2], ...
-                @(~, ~) app.runTrace(), 'nparaxial_v2_run_trace_secondary');
-            app.addPrescriptionButton('Load CSV', 14, 1, ...
-                @(~, ~) app.loadPrescriptionCsvDialog(), ...
-                'nparaxial_v2_load_prescription_csv');
-            app.addPrescriptionButton('Save CSV', 14, 2, ...
-                @(~, ~) app.savePrescriptionCsvDialog(), ...
-                'nparaxial_v2_save_prescription_csv');
-            app.addPrescriptionButton('Load MAT', 15, 1, ...
-                @(~, ~) app.loadPrescriptionMatDialog(), ...
-                'nparaxial_v2_load_prescription_mat');
-            app.addPrescriptionButton('Save MAT', 15, 2, ...
-                @(~, ~) app.savePrescriptionMatDialog(), ...
-                'nparaxial_v2_save_prescription_mat');
 
             app.PrescriptionTable = uitable(rayTopGrid);
             app.PrescriptionTable.Layout.Row = 1;
