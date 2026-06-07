@@ -1,5 +1,5 @@
 classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
-    %YU_NPARAXIALSURFACE_APP_V2 Pruned V1-style lightweight system viewer.
+    %YU_NPARAXIALSURFACE_APP_V2 Lightweight first-order system viewer.
 
     properties (Access = public)
         UIFigure matlab.ui.Figure

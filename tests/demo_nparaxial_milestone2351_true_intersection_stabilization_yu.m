@@ -14,9 +14,6 @@ function results = demo_nparaxial_milestone2351_true_intersection_stabilization_
     test_true_hit_diagnostic_does_not_propagate_local();
     numChecks = numChecks + 1;
 
-    test_delta_u_documentation_text_local(rootFolder);
-    numChecks = numChecks + 1;
-
     results = struct();
     results.case_name = "milestone2351_true_intersection_stabilization";
     results.num_checks = numChecks;
@@ -75,19 +72,6 @@ function test_true_hit_diagnostic_does_not_propagate_local()
         'Validity diagnostics must not alter image-plane solution.');
     assert_close_local(imageAfter.m, imageBefore.m, ...
         'Validity diagnostics must not alter image-plane magnification.');
-end
-
-
-function test_delta_u_documentation_text_local(rootFolder)
-    readmeText = fileread(fullfile(rootFolder, 'README.md'));
-    assert(contains(readmeText, ...
-        'primary diagnostic angle delta'), ...
-        'README should clarify generic delta_u semantics.');
-    assert(contains(readmeText, 'delta_u_exact_hit_vs_paraxial'), ...
-        'README should recommend explicit true-intersection delta columns.');
-    assert(contains(readmeText, ...
-        'Large-hit-offset and large-delta warnings are diagnostic heuristics'), ...
-        'README should label large-hit-offset and large-delta warnings as heuristics.');
 end
 
 

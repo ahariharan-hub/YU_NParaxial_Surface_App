@@ -32,14 +32,10 @@ function results = demo_nparaxial_milestone260_lightweight_v2_yu()
     [appSmoke, appChecks, runTraceSeconds] = v2_app_smoke_local(rootFolder);
     numChecks = numChecks + appChecks;
 
-    [v1Smoke, v1Checks] = v1_smoke_local(rootFolder);
-    numChecks = numChecks + v1Checks;
-
     results = struct();
     results.case_name = "milestone260_lightweight_v2";
     results.num_checks = numChecks;
     results.app_smoke = appSmoke;
-    results.v1_smoke = v1Smoke;
     results.v2_run_trace_s = runTraceSeconds;
 end
 
@@ -104,7 +100,7 @@ function [status, numChecks, runTraceSeconds] = v2_app_smoke_local(rootFolder)
         string(rayControlsPanel.Title) == "Ray Fan / Prescription Controls" && ...
         string(resetButton.Text) == "Reset Defaults" && ...
         istable(prescriptionTable.Data) && ~isempty(addThinLensButton), ...
-        'V2 should retain the V1-style shell, controls, and prescription editor.');
+        'V2 should retain the classic shell, controls, and prescription editor.');
     numChecks = numChecks + 1;
 
     runButton = find_by_tag_local(app.UIFigure, ...
@@ -354,34 +350,6 @@ function [status, numChecks, runTraceSeconds] = v2_app_smoke_local(rootFolder)
     numChecks = numChecks + 1;
 
     status = "passed";
-end
-
-
-function [status, numChecks] = v1_smoke_local(rootFolder)
-    status = "skipped";
-    numChecks = 0;
-    if ~usejava('awt')
-        return
-    end
-
-    oldPath = path;
-    cleanupPath = onCleanup(@() path(oldPath)); %#ok<NASGU>
-    addpath(rootFolder);
-    addpath(fullfile(rootFolder, 'core'));
-    addpath(fullfile(rootFolder, 'workflows'));
-    addpath(fullfile(rootFolder, 'plotting'));
-
-    app = YU_NParaxialSurface_App_V1();
-    cleanupApp = onCleanup(@() delete(app)); %#ok<NASGU>
-    app.UIFigure.Visible = 'off';
-    runButton = findall(app.UIFigure, ...
-        '-isa', 'matlab.ui.control.Button', 'Text', 'Run Trace');
-    assert(~isempty(runButton), 'V1 should still launch with Run Trace.');
-    call_callback_local(runButton(1).ButtonPushedFcn, runButton(1));
-    drawnow limitrate
-    assert(isvalid(app.UIFigure), 'V1 smoke trace should leave the app valid.');
-    status = "passed";
-    numChecks = 1;
 end
 
 

@@ -22,14 +22,10 @@ function results = demo_nparaxial_milestone262_v2_grating_object_mode_yu()
         v2_grating_smoke_local(rootFolder);
     numChecks = numChecks + appChecks;
 
-    [v1Smoke, v1Checks] = v1_smoke_local(rootFolder);
-    numChecks = numChecks + v1Checks;
-
     results = struct();
     results.case_name = "milestone262_v2_grating_object_mode";
     results.num_checks = numChecks;
     results.app_smoke = appSmoke;
-    results.v1_smoke = v1Smoke;
     results.point_run_trace_s = pointSeconds;
     results.grating_run_trace_s = gratingSeconds;
 end
@@ -194,34 +190,6 @@ function [status, numChecks, pointSeconds, gratingSeconds] = ...
     numChecks = numChecks + 1;
 
     status = "passed";
-end
-
-
-function [status, numChecks] = v1_smoke_local(rootFolder)
-    status = "skipped";
-    numChecks = 0;
-    if ~usejava('awt')
-        return
-    end
-
-    oldPath = path;
-    cleanupPath = onCleanup(@() path(oldPath)); %#ok<NASGU>
-    addpath(rootFolder);
-    addpath(fullfile(rootFolder, 'core'));
-    addpath(fullfile(rootFolder, 'workflows'));
-    addpath(fullfile(rootFolder, 'plotting'));
-
-    app = YU_NParaxialSurface_App_V1();
-    cleanupApp = onCleanup(@() delete(app)); %#ok<NASGU>
-    app.UIFigure.Visible = 'off';
-    runButton = findall(app.UIFigure, ...
-        '-isa', 'matlab.ui.control.Button', 'Text', 'Run Trace');
-    assert(~isempty(runButton), 'V1 should still launch with Run Trace.');
-    call_callback_local(runButton(1).ButtonPushedFcn, runButton(1));
-    drawnow limitrate
-    assert(isvalid(app.UIFigure), 'V1 smoke trace should leave the app valid.');
-    status = "passed";
-    numChecks = 1;
 end
 
 

@@ -1,7 +1,7 @@
 function out = demo_grating_object_paraxial_yu(showFigure, verbose)
 %DEMO_GRATING_OBJECT_PARAXIAL_YU Scriptable grating-object ray demo.
 %
-% This demo does not launch V1 or V2. The grating is treated only as an
+% This demo does not launch the app UI. The grating is treated only as an
 % object-plane ray launch condition; rays are traced with the existing
 % paraxial bundle tracer.
 

@@ -120,7 +120,8 @@ function status = test_app_dirty_state_smoke_local(rootFolder)
     cleanupPath = onCleanup(@() path(oldPath)); %#ok<NASGU>
     addpath(rootFolder);
 
-    app = YU_NParaxialSurface_App_V1();
+    status = "not_applicable_public_v2_tree";
+    return
     cleanupApp = onCleanup(@() delete(app)); %#ok<NASGU>
     app.UIFigure.Visible = 'off';
 
