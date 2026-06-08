@@ -3,6 +3,7 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
 
     properties (Access = public)
         UIFigure matlab.ui.Figure
+        ConfirmDestructiveActions logical = true
     end
 
     properties (Access = private)
@@ -289,7 +290,7 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             app.PresetDropdown.Layout.Column = 2;
 
             presetButton = uibutton(app.ControlGrid, 'push', ...
-                'Text', 'Load Default', ...
+                'Text', 'Load Prescription', ...
                 'Tag', 'nparaxial_v2_load_default', ...
                 'ButtonPushedFcn', @(~, ~) app.loadSelectedPreset());
             presetButton.Layout.Row = 19;
@@ -774,22 +775,62 @@ classdef YU_NParaxialSurface_App_V2 < matlab.apps.AppBase
             end
         end
 
+        function proceed = confirmDestructiveAction(app, titleText, messageText, proceedText)
+            proceed = true;
+
+            if ~app.ConfirmDestructiveActions
+                return
+            end
+
+            if isempty(app.UIFigure) || ~isvalid(app.UIFigure) || ...
+                    ~strcmpi(app.UIFigure.Visible, 'on')
+                return
+            end
+
+            selection = uiconfirm(app.UIFigure, messageText, titleText, ...
+                'Options', {char(proceedText), 'Cancel'}, ...
+                'DefaultOption', 2, ...
+                'CancelOption', 2);
+
+            proceed = string(selection) == string(proceedText);
+        end
+
         function resetDefaults(app)
+            proceed = app.confirmDestructiveAction( ...
+                "Reset Defaults?", ...
+                "Resetting defaults will discard current V2 control values and reload the default prescription. Continue?", ...
+                "Reset Defaults");
+
+            if ~proceed
+                app.setStatus("Reset defaults cancelled.", false);
+                return
+            end
+
             app.loadDefaults();
             app.setStatus("Defaults loaded. Run Trace to refresh V2.", false);
         end
 
         function loadSelectedPreset(app)
+            proceed = app.confirmDestructiveAction( ...
+                "Load Prescription?", ...
+                "Loading the selected prescription will replace the current prescription table and related case settings. Continue?", ...
+                "Load Prescription");
+
+            if ~proceed
+                app.setStatus("Load prescription cancelled.", false);
+                return
+            end
+
             try
                 caseDef = nparaxial_get_default_case_yu( ...
                     app.PresetDropdown.Value);
                 app.applyDefaultCase(caseDef, ...
-                    'Default case loaded. Run Trace to refresh V2.');
-                app.setStatus("Loaded default case: " + ...
+                    'Prescription loaded. Run Trace to refresh V2.');
+                app.setStatus("Loaded prescription: " + ...
                     app.caseDisplayLabel(caseDef) + ". " + ...
                     string(caseDef.teaching_point), false);
             catch ME
-                app.setStatus("Load default error: " + string(ME.message), true);
+                app.setStatus("Load prescription error: " + string(ME.message), true);
             end
         end
 
